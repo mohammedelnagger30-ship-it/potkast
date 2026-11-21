@@ -1,0 +1,2 @@
+[functions.daily-digest]
+verify_jwt = false

@@ -1,0 +1,1231 @@
+[
+  {
+    "name_ar": "ثمانية | Thmanyah",
+    "slug": "thmanyah",
+    "shows": [
+      {
+        "title": "الفجر",
+        "type": "cultural",
+        "episodes": 542
+      },
+      {
+        "title": "فنجان مع عبدالرحمن أبومالح",
+        "type": "professional",
+        "episodes": 364
+      },
+      {
+        "title": "مرتدة",
+        "type": "religious",
+        "episodes": 259
+      },
+      {
+        "title": "سقراط مع عمر الجريسي",
+        "type": "professional",
+        "episodes": 211
+      },
+      {
+        "title": "سوالف بزنس مع مشهور الدبيان",
+        "type": "professional",
+        "episodes": 179
+      },
+      {
+        "title": "بودكاست مربّع | مع حاتم النجار",
+        "type": "cultural",
+        "episodes": 148
+      },
+      {
+        "title": "بُكرة مع سلمى وعمرو",
+        "type": "cultural",
+        "episodes": 145
+      },
+      {
+        "title": "جادي",
+        "type": "professional",
+        "episodes": 87
+      },
+      {
+        "title": "السوق",
+        "type": "religious",
+        "episodes": 84
+      },
+      {
+        "title": "أشياء غيرتنا",
+        "type": "scientific",
+        "episodes": 74
+      },
+      {
+        "title": "امشِ مع",
+        "type": "cultural",
+        "episodes": 66
+      },
+      {
+        "title": "درجة أولى",
+        "type": "cultural",
+        "episodes": 49
+      },
+      {
+        "title": "أرباح",
+        "type": "professional",
+        "episodes": 42
+      },
+      {
+        "title": "أصوات",
+        "type": "cultural",
+        "episodes": 33
+      },
+      {
+        "title": "آدم مع محمد الحاجي",
+        "type": "scientific",
+        "episodes": 24
+      },
+      {
+        "title": "الكاجولز",
+        "type": "cultural",
+        "episodes": 24
+      },
+      {
+        "title": "تماس",
+        "type": "cultural",
+        "episodes": 24
+      },
+      {
+        "title": "ذا قال",
+        "type": "cultural",
+        "episodes": 23
+      },
+      {
+        "title": "النشرة السينمائية",
+        "type": "professional",
+        "episodes": 23
+      },
+      {
+        "title": "المحور الثاني",
+        "type": "professional",
+        "episodes": 22
+      },
+      {
+        "title": "برق مع عبدالله السبع",
+        "type": "religious",
+        "episodes": 19
+      },
+      {
+        "title": "الصفحة الأخيرة",
+        "type": "cultural",
+        "episodes": 13
+      },
+      {
+        "title": "مع التجار",
+        "type": "religious",
+        "episodes": 13
+      },
+      {
+        "title": "رابط تشعبي",
+        "type": "cultural",
+        "episodes": 12
+      },
+      {
+        "title": "احتيال",
+        "type": "cultural",
+        "episodes": 9
+      },
+      {
+        "title": "على بياض",
+        "type": "cultural",
+        "episodes": 8
+      },
+      {
+        "title": "بالخبرة مع ياسر القحطاني",
+        "type": "cultural",
+        "episodes": 6
+      },
+      {
+        "title": "الأشياء",
+        "type": "cultural",
+        "episodes": 6
+      },
+      {
+        "title": "الشركة",
+        "type": "professional",
+        "episodes": 2
+      }
+    ]
+  },
+  {
+    "name_ar": "مايكس | Mics",
+    "slug": "mics",
+    "shows": [
+      {
+        "title": "استشارة مع سارة",
+        "type": "cultural",
+        "episodes": 229
+      },
+      {
+        "title": "وجدان مع أسامة بن نجيفان",
+        "type": "cultural",
+        "episodes": 134
+      },
+      {
+        "title": "جناية",
+        "type": "cultural",
+        "episodes": 125
+      },
+      {
+        "title": "أسمار",
+        "type": "cultural",
+        "episodes": 117
+      },
+      {
+        "title": "جولان مع محمد الشثري",
+        "type": "scientific",
+        "episodes": 114
+      },
+      {
+        "title": "كنبة السبت",
+        "type": "cultural",
+        "episodes": 92
+      },
+      {
+        "title": "مهارات",
+        "type": "professional",
+        "episodes": 89
+      },
+      {
+        "title": "بعد التسعين",
+        "type": "cultural",
+        "episodes": 69
+      },
+      {
+        "title": "أزرق",
+        "type": "cultural",
+        "episodes": 51
+      },
+      {
+        "title": "هدوء",
+        "type": "scientific",
+        "episodes": 50
+      },
+      {
+        "title": "مسيان",
+        "type": "cultural",
+        "episodes": 45
+      },
+      {
+        "title": "الغرفة",
+        "type": "professional",
+        "episodes": 44
+      },
+      {
+        "title": "لمحات",
+        "type": "cultural",
+        "episodes": 43
+      },
+      {
+        "title": "على بياض",
+        "type": "professional",
+        "episodes": 41
+      },
+      {
+        "title": "التماس",
+        "type": "cultural",
+        "episodes": 37
+      },
+      {
+        "title": "قبس مع خالد اليحيا",
+        "type": "cultural",
+        "episodes": 32
+      },
+      {
+        "title": "وش السالفة",
+        "type": "cultural",
+        "episodes": 29
+      },
+      {
+        "title": "قبل الغروب",
+        "type": "religious",
+        "episodes": 28
+      },
+      {
+        "title": "مسودة",
+        "type": "cultural",
+        "episodes": 26
+      },
+      {
+        "title": "شمس",
+        "type": "cultural",
+        "episodes": 21
+      },
+      {
+        "title": "Pittsburgh Coffee قهوة بيتسبرغ",
+        "type": "religious",
+        "episodes": 20
+      },
+      {
+        "title": "Quizeculo كويزيكيلو",
+        "type": "scientific",
+        "episodes": 17
+      },
+      {
+        "title": "بيت الوجود",
+        "type": "cultural",
+        "episodes": 15
+      },
+      {
+        "title": "نجاة",
+        "type": "religious",
+        "episodes": 12
+      },
+      {
+        "title": "سهالات",
+        "type": "cultural",
+        "episodes": 11
+      },
+      {
+        "title": "الجود",
+        "type": "religious",
+        "episodes": 10
+      },
+      {
+        "title": "تكوين",
+        "type": "religious",
+        "episodes": 7
+      },
+      {
+        "title": "ممكن نتكلم..",
+        "type": "religious",
+        "episodes": 5
+      },
+      {
+        "title": "البيت",
+        "type": "cultural",
+        "episodes": 5
+      },
+      {
+        "title": "منصاف",
+        "type": "cultural",
+        "episodes": 3
+      },
+      {
+        "title": "لو حسبناها",
+        "type": "professional",
+        "episodes": 2
+      },
+      {
+        "title": "بروتين | Protein",
+        "type": "scientific",
+        "episodes": 2
+      }
+    ]
+  },
+  {
+    "name_ar": "صوت | Sowt",
+    "slug": "sowt",
+    "shows": [
+      {
+        "title": "Eib | عيب",
+        "type": "professional",
+        "episodes": 212
+      },
+      {
+        "title": "لحظة مع ميس",
+        "type": "scientific",
+        "episodes": 157
+      },
+      {
+        "title": "Almostajad | المُستجَد",
+        "type": "professional",
+        "episodes": 152
+      },
+      {
+        "title": "Dom Tak | دُمْ تَكْ",
+        "type": "cultural",
+        "episodes": 134
+      },
+      {
+        "title": "1001 Nights | ألف ليلة وليلة",
+        "type": "scientific",
+        "episodes": 133
+      },
+      {
+        "title": "مَنبِت | Manbet",
+        "type": "scientific",
+        "episodes": 126
+      },
+      {
+        "title": "Juha | جحا",
+        "type": "cultural",
+        "episodes": 115
+      },
+      {
+        "title": "Party Platter | ثلث مشكل",
+        "type": "professional",
+        "episodes": 89
+      },
+      {
+        "title": "Harrer | حرِّر",
+        "type": "cultural",
+        "episodes": 87
+      },
+      {
+        "title": "رحلة المصارعة",
+        "type": "scientific",
+        "episodes": 85
+      },
+      {
+        "title": "The Parliament | البرلمان",
+        "type": "cultural",
+        "episodes": 74
+      },
+      {
+        "title": "Al Qaed Al Sagheer Podcast | بودكاست القائد الصغير",
+        "type": "religious",
+        "episodes": 69
+      },
+      {
+        "title": "قهوة وخبرية مع مايا حجيج",
+        "type": "professional",
+        "episodes": 68
+      },
+      {
+        "title": "Tiki-taka | تيكي تاكا",
+        "type": "cultural",
+        "episodes": 67
+      },
+      {
+        "title": "كرسي الإثنين",
+        "type": "cultural",
+        "episodes": 62
+      },
+      {
+        "title": "صحتك أهم مع براء",
+        "type": "professional",
+        "episodes": 51
+      },
+      {
+        "title": "Sindbad | سندباد",
+        "type": "cultural",
+        "episodes": 49
+      },
+      {
+        "title": "Masaha | مساحة",
+        "type": "professional",
+        "episodes": 46
+      },
+      {
+        "title": "Blank Maps | خرائط اللامكان",
+        "type": "cultural",
+        "episodes": 45
+      },
+      {
+        "title": "قصص من فلسطين",
+        "type": "scientific",
+        "episodes": 44
+      },
+      {
+        "title": "Sharayet | شرايط",
+        "type": "cultural",
+        "episodes": 43
+      },
+      {
+        "title": "ما العمل",
+        "type": "cultural",
+        "episodes": 42
+      },
+      {
+        "title": "Millennial Mirrors",
+        "type": "cultural",
+        "episodes": 39
+      },
+      {
+        "title": "Ahraz | أحراز",
+        "type": "cultural",
+        "episodes": 38
+      },
+      {
+        "title": "أحاديث بتشبهنا",
+        "type": "cultural",
+        "episodes": 36
+      },
+      {
+        "title": "Ahwal | أحوال",
+        "type": "religious",
+        "episodes": 35
+      },
+      {
+        "title": "Alsilah | الصلة",
+        "type": "cultural",
+        "episodes": 34
+      },
+      {
+        "title": "Matryoshka | ماتريوشكا",
+        "type": "cultural",
+        "episodes": 34
+      },
+      {
+        "title": "Bar Bahr | بر بحر",
+        "type": "professional",
+        "episodes": 32
+      },
+      {
+        "title": "Mahdoom | مهضوم",
+        "type": "scientific",
+        "episodes": 31
+      },
+      {
+        "title": "ناعم و فلفول",
+        "type": "cultural",
+        "episodes": 30
+      },
+      {
+        "title": "حياتنا كورة مع محمد عواد",
+        "type": "cultural",
+        "episodes": 28
+      },
+      {
+        "title": "Maqsouda | مقصودة",
+        "type": "cultural",
+        "episodes": 27
+      },
+      {
+        "title": "سوبر ماما",
+        "type": "professional",
+        "episodes": 27
+      },
+      {
+        "title": "عالم الMMA",
+        "type": "religious",
+        "episodes": 27
+      },
+      {
+        "title": "أبو عبدو الحكواتي",
+        "type": "religious",
+        "episodes": 26
+      },
+      {
+        "title": "3 Points عالصبح",
+        "type": "religious",
+        "episodes": 26
+      },
+      {
+        "title": "مد وجزر | Mad wa Jazr",
+        "type": "cultural",
+        "episodes": 25
+      },
+      {
+        "title": "جرائم وغموض",
+        "type": "cultural",
+        "episodes": 24
+      },
+      {
+        "title": "Watr | وتر",
+        "type": "cultural",
+        "episodes": 24
+      },
+      {
+        "title": "كواليس صوت: كيف نصنع البودكاست",
+        "type": "cultural",
+        "episodes": 24
+      },
+      {
+        "title": "The Basement | القبو",
+        "type": "professional",
+        "episodes": 23
+      },
+      {
+        "title": "Maloom | معلوم",
+        "type": "scientific",
+        "episodes": 23
+      },
+      {
+        "title": "Secret of Art | سر الارت",
+        "type": "cultural",
+        "episodes": 23
+      },
+      {
+        "title": "Eyab | إياب",
+        "type": "cultural",
+        "episodes": 22
+      },
+      {
+        "title": "The 40 Thieves | الأربعون حرامي",
+        "type": "cultural",
+        "episodes": 20
+      },
+      {
+        "title": "مشروع محلي",
+        "type": "professional",
+        "episodes": 20
+      },
+      {
+        "title": "إذًا أعزائي",
+        "type": "cultural",
+        "episodes": 18
+      },
+      {
+        "title": "Vikings: The Nine Realms | فايكنغز: العوالم التسعة",
+        "type": "professional",
+        "episodes": 15
+      },
+      {
+        "title": "عمالقة الطريق",
+        "type": "professional",
+        "episodes": 14
+      },
+      {
+        "title": "The Code | الشفرة",
+        "type": "religious",
+        "episodes": 13
+      },
+      {
+        "title": "Loosely Adapted",
+        "type": "cultural",
+        "episodes": 13
+      },
+      {
+        "title": "Saad | صاد",
+        "type": "cultural",
+        "episodes": 12
+      },
+      {
+        "title": "Binbir Gece Masalları",
+        "type": "cultural",
+        "episodes": 11
+      },
+      {
+        "title": "محطات",
+        "type": "cultural",
+        "episodes": 11
+      },
+      {
+        "title": "Ismi | اسمي",
+        "type": "religious",
+        "episodes": 11
+      },
+      {
+        "title": "Mal Amal: Podcast about Labour Rights",
+        "type": "cultural",
+        "episodes": 11
+      },
+      {
+        "title": "Nafas | نَفَس",
+        "type": "cultural",
+        "episodes": 10
+      },
+      {
+        "title": "الرسول",
+        "type": "religious",
+        "episodes": 10
+      },
+      {
+        "title": "Yalla",
+        "type": "cultural",
+        "episodes": 10
+      },
+      {
+        "title": "Taalimna | تعليمنا",
+        "type": "scientific",
+        "episodes": 10
+      },
+      {
+        "title": "دَيْن ورا دَيْن | Dayn Wara Dayn",
+        "type": "religious",
+        "episodes": 10
+      },
+      {
+        "title": "Mashghool | مشغول",
+        "type": "professional",
+        "episodes": 10
+      },
+      {
+        "title": "Indymedia | إندِميديا",
+        "type": "cultural",
+        "episodes": 9
+      },
+      {
+        "title": "Mija | بنتي",
+        "type": "cultural",
+        "episodes": 9
+      },
+      {
+        "title": "واحد صفر",
+        "type": "scientific",
+        "episodes": 9
+      },
+      {
+        "title": "CTRL | تحكم",
+        "type": "religious",
+        "episodes": 9
+      },
+      {
+        "title": "Ya Rayeh | يا رايح",
+        "type": "cultural",
+        "episodes": 8
+      },
+      {
+        "title": "عالم القصص",
+        "type": "professional",
+        "episodes": 8
+      },
+      {
+        "title": "دار الحي",
+        "type": "professional",
+        "episodes": 8
+      },
+      {
+        "title": "Tawel Omrak | طوّل عمرك",
+        "type": "scientific",
+        "episodes": 7
+      },
+      {
+        "title": "Our Darkest Day",
+        "type": "cultural",
+        "episodes": 7
+      },
+      {
+        "title": "A Conversation With | حوار مع",
+        "type": "cultural",
+        "episodes": 7
+      },
+      {
+        "title": "٧ بهارات",
+        "type": "scientific",
+        "episodes": 7
+      },
+      {
+        "title": "Legendary Rock Stories",
+        "type": "cultural",
+        "episodes": 6
+      },
+      {
+        "title": "Beirut Blast",
+        "type": "cultural",
+        "episodes": 6
+      },
+      {
+        "title": "من حولنا أصوات",
+        "type": "cultural",
+        "episodes": 5
+      },
+      {
+        "title": "ما وراء",
+        "type": "scientific",
+        "episodes": 5
+      },
+      {
+        "title": "مع بن ماجد",
+        "type": "cultural",
+        "episodes": 5
+      },
+      {
+        "title": "Visualizing Conflict | تصوير النزاعات",
+        "type": "cultural",
+        "episodes": 3
+      },
+      {
+        "title": "الخلافة",
+        "type": "religious",
+        "episodes": 3
+      },
+      {
+        "title": "قصص لعبناها",
+        "type": "cultural",
+        "episodes": 3
+      },
+      {
+        "title": "بودكاست جديد من صوت.. قريبًا",
+        "type": "professional",
+        "episodes": 1
+      }
+    ]
+  },
+  {
+    "name_ar": "الدحيح",
+    "slug": "el-daheeh",
+    "shows": [
+      {
+        "title": "El Daheeh - الدحيح",
+        "type": "scientific",
+        "episodes": 375
+      },
+      {
+        "title": "Fe El Hadara - في الحضارة",
+        "type": "scientific",
+        "episodes": 151
+      },
+      {
+        "title": "Banknote Talks",
+        "type": "professional",
+        "episodes": 59
+      },
+      {
+        "title": "The Story Behind",
+        "type": "scientific",
+        "episodes": 8
+      }
+    ]
+  },
+  {
+    "name_ar": "مصطفى حسني",
+    "slug": "mustafa-hosny",
+    "shows": [
+      {
+        "title": "Mustafa Hosny - مصطفى حسني",
+        "type": "religious",
+        "episodes": 500
+      },
+      {
+        "title": "Selselet Altareeq - Mustafa Hosny - سلسلة الطريق - مصطفى حسني",
+        "type": "religious",
+        "episodes": 95
+      },
+      {
+        "title": "Asweyaa - Mustafa Hosny - أسوياء - قصص حياة الصحابة - مصطفى حسني",
+        "type": "religious",
+        "episodes": 87
+      },
+      {
+        "title": "Noor - ElSira ElNabwyah - Mustafa Hosny - نور - السيرة النبوية - مصطفى حسني",
+        "type": "religious",
+        "episodes": 40
+      },
+      {
+        "title": "Baseer - Mustafa Hosny - بصير - مصطفى حسني",
+        "type": "religious",
+        "episodes": 30
+      },
+      {
+        "title": "ElHesn - Mustafa Hosny - الحصن - مصطفى حسني",
+        "type": "religious",
+        "episodes": 30
+      },
+      {
+        "title": "Nefoos - Mustafa Hosny - نفوس - مصطفى حسني",
+        "type": "religious",
+        "episodes": 30
+      },
+      {
+        "title": "Khaterat AlFjr - Ramadan 2025 - خاطرة الفجر - رمضان 2025",
+        "type": "religious",
+        "episodes": 30
+      },
+      {
+        "title": "Khaterat AlFjr - Ramadan 2026 - خاطرة الفجر - رمضان 2026",
+        "type": "religious",
+        "episodes": 30
+      },
+      {
+        "title": "Takbirat El-Eid - تكبيرات العيد",
+        "type": "religious",
+        "episodes": 1
+      }
+    ]
+  },
+  {
+    "name_ar": "أمجد سمير",
+    "slug": "amgad-samir",
+    "shows": [
+      {
+        "title": "الشيخ أمجد سمير",
+        "type": "religious",
+        "episodes": 79
+      }
+    ]
+  },
+  {
+    "name_ar": "TPP",
+    "slug": "tpp",
+    "shows": [
+      {
+        "title": "Pieces To Wellness",
+        "type": "professional",
+        "episodes": 149
+      },
+      {
+        "title": "Kefaya Ba2a | كفاية بقى",
+        "type": "religious",
+        "episodes": 148
+      },
+      {
+        "title": "اشتري مني",
+        "type": "professional",
+        "episodes": 145
+      },
+      {
+        "title": "!!هو في إيه يا جماعة؟",
+        "type": "scientific",
+        "episodes": 71
+      },
+      {
+        "title": "كبرني بودكاست",
+        "type": "professional",
+        "episodes": 70
+      },
+      {
+        "title": "2043 Podcast",
+        "type": "professional",
+        "episodes": 55
+      },
+      {
+        "title": "Dina G.",
+        "type": "religious",
+        "episodes": 52
+      },
+      {
+        "title": "كلام بالعقل مع د.باسم سليمان",
+        "type": "scientific",
+        "episodes": 42
+      },
+      {
+        "title": "Omam - أُمم مع ميرنا الزيني",
+        "type": "religious",
+        "episodes": 42
+      },
+      {
+        "title": "ّمن النهارده مع حنان البهي",
+        "type": "professional",
+        "episodes": 41
+      },
+      {
+        "title": "The Potcast Show",
+        "type": "professional",
+        "episodes": 36
+      },
+      {
+        "title": "ة مربوطة",
+        "type": "professional",
+        "episodes": 25
+      },
+      {
+        "title": "انتهت حلول الأرض مع محمد شحاتة",
+        "type": "professional",
+        "episodes": 20
+      },
+      {
+        "title": "ع المخدة مع مروان يونس",
+        "type": "professional",
+        "episodes": 19
+      },
+      {
+        "title": "ساعة عصاري The Afternoon Hour",
+        "type": "cultural",
+        "episodes": 14
+      },
+      {
+        "title": "The Heidi Elabd Show",
+        "type": "professional",
+        "episodes": 13
+      },
+      {
+        "title": "The Defty Life Podcast",
+        "type": "professional",
+        "episodes": 12
+      },
+      {
+        "title": "The Pod Piper",
+        "type": "professional",
+        "episodes": 11
+      },
+      {
+        "title": "Emy Convos",
+        "type": "professional",
+        "episodes": 10
+      },
+      {
+        "title": "It's PRsonal by Ingy Yousri Ismail",
+        "type": "professional",
+        "episodes": 8
+      },
+      {
+        "title": "Set N Talk with Seif Dooby",
+        "type": "professional",
+        "episodes": 8
+      },
+      {
+        "title": "كلام المال",
+        "type": "religious",
+        "episodes": 5
+      },
+      {
+        "title": "TPP Specials",
+        "type": "cultural",
+        "episodes": 5
+      },
+      {
+        "title": "elleKHAN Podcast",
+        "type": "professional",
+        "episodes": 4
+      },
+      {
+        "title": "From Cairo to NY",
+        "type": "professional",
+        "episodes": 4
+      },
+      {
+        "title": "Fardn Ya3ny - فرضًا يعني",
+        "type": "religious",
+        "episodes": 4
+      },
+      {
+        "title": "Masar - مسار",
+        "type": "professional",
+        "episodes": 3
+      },
+      {
+        "title": "Curious Minds",
+        "type": "professional",
+        "episodes": 3
+      },
+      {
+        "title": "tpp",
+        "type": "professional",
+        "episodes": 2
+      },
+      {
+        "title": "Poetry Beyond Borders - شعر بلا حدود",
+        "type": "professional",
+        "episodes": 2
+      },
+      {
+        "title": "Testing Positive",
+        "type": "professional",
+        "episodes": 1
+      }
+    ]
+  },
+  {
+    "name_ar": "هلال السيد",
+    "slug": "helal-elsayed",
+    "shows": [
+      {
+        "title": "فاهم",
+        "type": "religious",
+        "episodes": 91
+      }
+    ]
+  },
+  {
+    "name_ar": "وعي",
+    "slug": "wa3y",
+    "shows": [
+      {
+        "title": "وعي",
+        "type": "cultural",
+        "episodes": 115
+      }
+    ]
+  },
+  {
+    "name_ar": "بودكاست عقلية",
+    "slug": "aqleya",
+    "shows": [
+      {
+        "title": "بودكاست عقلية",
+        "type": "professional",
+        "episodes": 32
+      }
+    ]
+  },
+  {
+    "name_ar": "إذاعة مختلف",
+    "slug": "mukhtalif",
+    "shows": [
+      {
+        "title": "بترولي",
+        "type": "religious",
+        "episodes": 431
+      },
+      {
+        "title": "قضية",
+        "type": "professional",
+        "episodes": 69
+      },
+      {
+        "title": "مناوب",
+        "type": "cultural",
+        "episodes": 62
+      },
+      {
+        "title": "أروقة",
+        "type": "professional",
+        "episodes": 57
+      },
+      {
+        "title": "غلاف",
+        "type": "professional",
+        "episodes": 56
+      },
+      {
+        "title": "بكرة مع علي العزازي",
+        "type": "professional",
+        "episodes": 47
+      },
+      {
+        "title": "شغلة",
+        "type": "professional",
+        "episodes": 44
+      },
+      {
+        "title": "حقيبة",
+        "type": "cultural",
+        "episodes": 26
+      },
+      {
+        "title": "بارتشن",
+        "type": "professional",
+        "episodes": 24
+      },
+      {
+        "title": "نجم الشمال",
+        "type": "professional",
+        "episodes": 22
+      },
+      {
+        "title": "عوالم",
+        "type": "professional",
+        "episodes": 20
+      },
+      {
+        "title": "سيرة",
+        "type": "religious",
+        "episodes": 19
+      },
+      {
+        "title": "مناقشة",
+        "type": "scientific",
+        "episodes": 18
+      },
+      {
+        "title": "المستشار",
+        "type": "professional",
+        "episodes": 15
+      },
+      {
+        "title": "يونيكورن",
+        "type": "cultural",
+        "episodes": 15
+      },
+      {
+        "title": "استفهام",
+        "type": "cultural",
+        "episodes": 13
+      },
+      {
+        "title": "سيناريو",
+        "type": "religious",
+        "episodes": 8
+      },
+      {
+        "title": "صحيفة",
+        "type": "cultural",
+        "episodes": 6
+      },
+      {
+        "title": "إمكان",
+        "type": "cultural",
+        "episodes": 6
+      },
+      {
+        "title": "هنداس",
+        "type": "cultural",
+        "episodes": 5
+      },
+      {
+        "title": "ديناميكا",
+        "type": "religious",
+        "episodes": 3
+      }
+    ]
+  },
+  {
+    "name_ar": "جام ستديو",
+    "slug": "jam-studio",
+    "shows": [
+      {
+        "title": "بودكاست يصير خير",
+        "type": "religious",
+        "episodes": 84
+      },
+      {
+        "title": "بودكاست عوافي",
+        "type": "religious",
+        "episodes": 38
+      }
+    ]
+  },
+  {
+    "name_ar": "سمير مصطفي",
+    "slug": "samir-mustafa",
+    "shows": [
+      {
+        "title": "قناة الشيخ سمير مصطفي",
+        "type": "religious",
+        "episodes": 259
+      }
+    ]
+  },
+  {
+    "name_ar": "علم ينتفع به",
+    "slug": "ilm-yunfa",
+    "shows": [
+      {
+        "title": "موسوعة الدروس الدينية لكبار علماء الإسلام",
+        "type": "religious",
+        "episodes": 211
+      },
+      {
+        "title": "روائع الابتهال الديني",
+        "type": "religious",
+        "episodes": 171
+      },
+      {
+        "title": "المصحف المعلم للكبار للشيخ الحصري",
+        "type": "religious",
+        "episodes": 115
+      },
+      {
+        "title": "المصحف المعلم للأطفال للشيخ الحصري",
+        "type": "religious",
+        "episodes": 114
+      },
+      {
+        "title": "This is Islam",
+        "type": "religious",
+        "episodes": 114
+      },
+      {
+        "title": "الطريق إلى النجاح - د. إبراهيم الفقي",
+        "type": "religious",
+        "episodes": 104
+      },
+      {
+        "title": "تفسير الشعراوي كاملاً",
+        "type": "religious",
+        "episodes": 89
+      },
+      {
+        "title": "قصص القرآن",
+        "type": "religious",
+        "episodes": 65
+      },
+      {
+        "title": "إرث العوضي (نظام الطيبات كاملاً)",
+        "type": "religious",
+        "episodes": 51
+      },
+      {
+        "title": "Understanding Islam",
+        "type": "religious",
+        "episodes": 29
+      },
+      {
+        "title": "دعاء الملائكة",
+        "type": "religious",
+        "episodes": 20
+      },
+      {
+        "title": "أسماء الله الحسنى",
+        "type": "religious",
+        "episodes": 20
+      }
+    ]
+  }
+]
