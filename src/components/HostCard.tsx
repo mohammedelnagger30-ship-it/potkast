@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
-import { BadgeCheck, Mic, Users } from 'lucide-react';
+import { BadgeCheck } from 'lucide-react';
 import type { Host } from '@/types/podcast';
-import { formatCount } from '@/types/podcast';
 
 interface HostCardProps {
   host: Host;
@@ -74,17 +73,6 @@ export function HostCard({ host, compact = false }: HostCardProps) {
       {host.country && (
         <p className="text-[11px] text-neutral-400 mt-0.5">{host.country}</p>
       )}
-
-      <div className="flex items-center gap-3 mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800 w-full justify-center text-xs text-neutral-500 dark:text-neutral-400">
-        <span className="flex items-center gap-1">
-          <Users size={13} />
-          {formatCount(host.followers_count)}
-        </span>
-        <span className="flex items-center gap-1">
-          <Mic size={13} />
-          {host.podcasts_count ?? 0} بودكاست
-        </span>
-      </div>
     </Link>
   );
 }

@@ -1,4 +1,4 @@
-import { Moon, Sun, Bell } from 'lucide-react';
+import { Moon, Sun, Bell, Settings2, UserRound } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { Link } from 'react-router-dom';
 
@@ -18,6 +18,20 @@ export function Header({ title }: { title: string }) {
           >
             <Bell size={20} />
             <span className="absolute top-2 right-2 w-2 h-2 bg-accent-500 rounded-full" />
+          </Link>
+          <Link
+            to="/profile"
+            className="flex items-center justify-center w-10 h-10 rounded-xl text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800 transition-all duration-200"
+            aria-label="الملف الشخصي"
+          >
+            <UserRound size={20} />
+          </Link>
+          <Link
+            to="/settings"
+            className="flex items-center justify-center w-10 h-10 rounded-xl text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800 transition-all duration-200"
+            aria-label="الإعدادات"
+          >
+            <Settings2 size={20} />
           </Link>
           <button
             onClick={toggleTheme}

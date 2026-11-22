@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, type MouseEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Play,
   Pause,
@@ -12,6 +12,8 @@ import {
   Repeat,
   Repeat1,
   X,
+  Maximize2,
+  Loader2,
 } from 'lucide-react';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { formatTime } from '@/types/podcast';
@@ -19,10 +21,12 @@ import { formatTime } from '@/types/podcast';
 const speedOptions = [0.75, 1, 1.25, 1.5, 2];
 
 export function AudioPlayer() {
+  const navigate = useNavigate();
   const {
     currentEpisode,
     currentPodcast,
     isPlaying,
+    isBuffering,
     currentTime,
     duration,
     volume,
@@ -41,6 +45,13 @@ export function AudioPlayer() {
 
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
 
+  // Clicking anywhere on the bar (cover, title, empty space) opens the full
+  // player. Controls, links and the seek bar keep their own behaviour.
+  const openFullPlayer = (event: MouseEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest('button, a, input, [data-player-seek]')) return;
+    navigate('/player');
+  };
+
   if (!currentEpisode) return null;
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -51,10 +62,14 @@ export function AudioPlayer() {
   return (
     <>
       {/* Mobile: above bottom nav. Desktop: full-width bar */}
-      <div className="fixed bottom-0 inset-x-0 z-40 lg:bottom-0 lg:inset-x-0 lg:right-0 lg:w-[calc(100%-16rem)]">
+      <div
+        onClick={openFullPlayer}
+        title="افتح المشغل الكامل"
+        className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] inset-x-0 z-50 cursor-pointer lg:bottom-0 lg:inset-x-0 lg:right-0 lg:w-[calc(100%-16rem)]"
+      >
         <div className="glass-effect border-t border-neutral-200 dark:border-neutral-800 shadow-lg">
           {/* Progress bar (top line) */}
-          <div className="relative h-1 bg-neutral-200 dark:bg-neutral-800 cursor-pointer group" onClick={(e) => {
+          <div data-player-seek className="relative h-1 bg-neutral-200 dark:bg-neutral-800 cursor-pointer group" onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             const pct = (e.clientX - rect.left) / rect.width;
             seek(pct * duration);
@@ -85,8 +100,15 @@ export function AudioPlayer() {
                   {currentEpisode.title}
                 </p>
                 <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
-                  {podcastTitle}
-                  {host?.slug && (
+                  {isBuffering ? (
+                    <span className="inline-flex items-center gap-1 text-primary-600 dark:text-primary-400">
+                      <Loader2 size={11} className="animate-spin" />
+                      جارٍ تجهيز الصوت...
+                    </span>
+                  ) : (
+                    podcastTitle
+                  )}
+                  {!isBuffering && host?.slug && (
                     <> • <Link to={`/hosts/${host.slug}`} className="hover:text-primary-600 dark:hover:text-primary-400 transition-colors">{host.name_ar}</Link></>
                   )}
                 </p>
@@ -114,9 +136,15 @@ export function AudioPlayer() {
               <button
                 onClick={togglePlay}
                 className="flex items-center justify-center w-11 h-11 rounded-full bg-primary-600 text-white hover:bg-primary-700 active:scale-95 transition-all shadow-sm"
-                aria-label={isPlaying ? 'إيقاف' : 'تشغيل'}
+                aria-label={isBuffering ? 'جارٍ التشغيل' : isPlaying ? 'إيقاف' : 'تشغيل'}
               >
-                {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="mr-0.5" />}
+                {isBuffering ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : isPlaying ? (
+                  <Pause size={20} fill="currentColor" />
+                ) : (
+                  <Play size={20} fill="currentColor" className="mr-0.5" />
+                )}
               </button>
 
               <button
@@ -208,6 +236,16 @@ export function AudioPlayer() {
                 />
               </div>
 
+              {/* Full player */}
+              <button
+                onClick={() => navigate('/player')}
+                className="text-neutral-400 hover:text-primary-600 transition-all"
+                aria-label="فتح المشغل الكامل"
+                title="فتح المشغل الكامل"
+              >
+                <Maximize2 size={18} />
+              </button>
+
               {/* Close */}
               <button
                 onClick={stop}
@@ -232,6 +270,14 @@ export function AudioPlayer() {
                 className="px-2 h-7 rounded-lg text-[10px] font-bold text-neutral-600 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800"
               >
                 {playbackRate}x
+              </button>
+              <button
+                onClick={() => navigate('/player')}
+                className="text-neutral-400 hover:text-primary-600 transition-all"
+                aria-label="فتح المشغل الكامل"
+                title="فتح المشغل الكامل"
+              >
+                <Maximize2 size={17} />
               </button>
             </div>
           </div>

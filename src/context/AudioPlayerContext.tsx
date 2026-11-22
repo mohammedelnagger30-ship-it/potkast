@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback, ty
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { updateStatsOnListen } from '@/lib/statsHelper';
+import { localUrlFor, OFFLINE_AUDIO_PREFIX } from '@/lib/downloads';
+import { notifyProgressChanged } from '@/lib/progress';
 import type { Episode, Podcast } from '@/types/podcast';
 
 export type RepeatMode = 'none' | 'one' | 'all';
@@ -12,6 +14,7 @@ interface PlayerState {
   queue: Episode[];
   queueIndex: number;
   isPlaying: boolean;
+  isBuffering: boolean;
   currentTime: number;
   duration: number;
   volume: number;
@@ -35,10 +38,97 @@ interface AudioPlayerContextValue extends PlayerState {
 const AudioPlayerContext = createContext<AudioPlayerContextValue | undefined>(undefined);
 
 const SAVE_INTERVAL_MS = 5000;
+const PROGRESS_CACHE_KEY = 'nammy:progress-cache';
 
-// No experimental/placeholder audio: only real episode audio URLs are played.
-function resolveAudioUrl(url?: string | null): string {
-  return url || '';
+// Play the downloaded file when one exists, otherwise stream the real remote URL.
+// No experimental/placeholder audio is ever played.
+function resolveAudioUrl(url?: string | null, episodeId?: string): string {
+  return (episodeId && localUrlFor(episodeId)) || url || '';
+}
+
+// Metadata may still be loading when the saved position arrives. Apply it as
+// soon as the element is seekable, and only if this is still the same source.
+function seekWhenReady(audio: HTMLAudioElement, time: number, isCurrent: () => boolean) {
+  const apply = () => {
+    if (!isCurrent()) return;
+    try {
+      audio.currentTime = time;
+    } catch {
+      // Not seekable yet — the loadedmetadata listener will retry.
+    }
+  };
+  if (audio.readyState >= 1) apply();
+  else audio.addEventListener('loadedmetadata', apply, { once: true });
+}
+
+// ProgressContext keeps a local copy of listening_history. Reading it here
+// means playback can start from the saved position in one request, instead of
+// starting from zero and seeking later (which forces a second range request).
+function cachedResumeFor(episodeId: string): number {
+  try {
+    const raw = localStorage.getItem(PROGRESS_CACHE_KEY);
+    if (!raw) return 0;
+    const cache = JSON.parse(raw) as { history?: Array<{ episode_id: string; progress_seconds: number; completed: boolean }> };
+    const row = cache.history?.find((item) => item.episode_id === episodeId);
+    return row && !row.completed && row.progress_seconds > 5 ? Math.floor(row.progress_seconds) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function withStartAt(url: string, seconds: number): string {
+  if (!url || seconds <= 5) return url;
+  return `${url.split('#')[0]}#t=${Math.floor(seconds)}`;
+}
+
+function isLocalAudioUrl(url: string): boolean {
+  return url.startsWith('blob:') || url.startsWith(OFFLINE_AUDIO_PREFIX) || url.startsWith('/');
+}
+
+/**
+ * A `#t=` fragment makes the browser wait for a second Range request before it
+ * fires `playing`. On real CDNs that can add tens of seconds. Local files seek
+ * instantly, so we only use the fragment there; remote audio starts now and
+ * jumps to the saved position once it is already audible.
+ */
+function sourceFor(episodeId: string | undefined, audioUrl: string | null | undefined, resumeAt: number) {
+  const url = resolveAudioUrl(audioUrl, episodeId);
+  const local = isLocalAudioUrl(url);
+  return { url: local ? withStartAt(url, resumeAt) : url, local };
+}
+
+function resumeAfterAudible(
+  audio: HTMLAudioElement,
+  time: number,
+  isCurrent: () => boolean,
+) {
+  const apply = () => {
+    if (!isCurrent()) return;
+    try {
+      if (typeof audio.fastSeek === 'function') audio.fastSeek(time);
+      else audio.currentTime = time;
+    } catch {
+      try { audio.currentTime = time; } catch { /* source changed */ }
+    }
+  };
+
+  const onTime = () => {
+    if (audio.currentTime >= 0.2) {
+      audio.removeEventListener('timeupdate', onTime);
+      audio.removeEventListener('playing', onPlaying);
+      apply();
+    }
+  };
+  const onPlaying = () => {
+    // Fallback for browsers that don't emit timeupdate quickly.
+    window.setTimeout(() => {
+      audio.removeEventListener('timeupdate', onTime);
+      apply();
+    }, 150);
+  };
+
+  audio.addEventListener('timeupdate', onTime);
+  audio.addEventListener('playing', onPlaying, { once: true });
 }
 
 export function AudioPlayerProvider({ children }: { children: ReactNode }) {
@@ -46,12 +136,16 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastSaveRef = useRef(0);
   const progressRef = useRef(0);
+  // Incremented whenever the source changes so a slow history lookup can't
+  // seek a later episode or override a newer user action.
+  const playTokenRef = useRef(0);
 
   const [currentEpisode, setCurrentEpisode] = useState<Episode | null>(null);
   const [currentPodcast, setCurrentPodcast] = useState<Podcast | null>(null);
   const [queue, setQueue] = useState<Episode[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(1);
@@ -71,17 +165,28 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     };
     const onDurationChange = () => setDuration(audio.duration || 0);
     const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
+    const onPlaying = () => {
+      setIsPlaying(true);
+      setIsBuffering(false);
+    };
+    const onWaiting = () => setIsBuffering(true);
+    const onPause = () => {
+      setIsPlaying(false);
+      setIsBuffering(false);
+    };
     const onEnded = () => handleEnded();
     const onLoadedMetadata = () => setDuration(audio.duration || 0);
     const onError = () => {
       setIsPlaying(false);
+      setIsBuffering(false);
     };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('durationchange', onDurationChange);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
     audio.addEventListener('play', onPlay);
+    audio.addEventListener('playing', onPlaying);
+    audio.addEventListener('waiting', onWaiting);
     audio.addEventListener('pause', onPause);
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('error', onError);
@@ -91,6 +196,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener('durationchange', onDurationChange);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
       audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('playing', onPlaying);
+      audio.removeEventListener('waiting', onWaiting);
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('error', onError);
@@ -120,7 +227,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       if (now - lastSaveRef.current < SAVE_INTERVAL_MS && !completed) return;
       lastSaveRef.current = now;
 
-      await supabase
+      const { error } = await supabase
         .from('listening_history')
         .upsert({
           user_id: user.id,
@@ -129,6 +236,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           completed,
           updated_at: new Date().toISOString(),
         });
+
+      if (!error) notifyProgressChanged();
 
       // Update stats tables
       updateStatsOnListen(user.id, episodeId, Math.floor(seconds), completed).catch(() => {});
@@ -143,6 +252,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
     if (repeatMode === 'one') {
       if (audioRef.current) {
+        playTokenRef.current += 1;
         audioRef.current.currentTime = 0;
         audioRef.current.play().catch(() => setIsPlaying(false));
       }
@@ -156,17 +266,34 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       const nextEp = queue[nextIdx];
       setCurrentEpisode(nextEp);
       if (audioRef.current) {
-        audioRef.current.src = resolveAudioUrl(nextEp.audio_url);
-        audioRef.current.play().catch(() => setIsPlaying(false));
+        const audio = audioRef.current;
+        const token = ++playTokenRef.current;
+        const resumeAt = cachedResumeFor(nextEp.id);
+        const source = sourceFor(nextEp.id, nextEp.audio_url, resumeAt);
+        audio.src = source.url;
+        setIsBuffering(true);
+        audio.play().catch(() => { if (token === playTokenRef.current) setIsPlaying(false); });
+        if (!source.local && resumeAt > 5) {
+          resumeAfterAudible(audio, resumeAt, () => token === playTokenRef.current && audioRef.current === audio);
+        }
       }
     } else if (repeatMode === 'all' && queue.length > 0) {
       setQueueIndex(0);
       setCurrentEpisode(queue[0]);
       if (audioRef.current) {
-        audioRef.current.src = resolveAudioUrl(queue[0].audio_url);
-        audioRef.current.play().catch(() => setIsPlaying(false));
+        const audio = audioRef.current;
+        const token = ++playTokenRef.current;
+        const resumeAt = cachedResumeFor(queue[0].id);
+        const source = sourceFor(queue[0].id, queue[0].audio_url, resumeAt);
+        audio.src = source.url;
+        setIsBuffering(true);
+        audio.play().catch(() => { if (token === playTokenRef.current) setIsPlaying(false); });
+        if (!source.local && resumeAt > 5) {
+          resumeAfterAudible(audio, resumeAt, () => token === playTokenRef.current && audioRef.current === audio);
+        }
       }
     } else {
+      playTokenRef.current += 1;
       setIsPlaying(false);
     }
   }, [currentEpisode, duration, queue, queueIndex, repeatMode, saveProgress]);
@@ -206,25 +333,48 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         setQueueIndex(idx >= 0 ? idx : 0);
       }
 
-      audioRef.current.src = resolveAudioUrl(episode.audio_url);
-      audioRef.current.playbackRate = playbackRate;
+      const audio = audioRef.current;
+      const token = ++playTokenRef.current;
+      const resumeAt = cachedResumeFor(episode.id);
+      const isCurrent = () => token === playTokenRef.current && audioRef.current === audio;
+      const source = sourceFor(episode.id, episode.audio_url, resumeAt);
+      audio.src = source.url;
+      audio.playbackRate = playbackRate;
+      setIsBuffering(true);
 
-      // Resume from saved progress
-      if (user) {
-        supabase
-          .from('listening_history')
-          .select('progress_seconds, completed')
-          .eq('user_id', user.id)
-          .eq('episode_id', episode.id)
-          .maybeSingle()
-          .then(({ data }) => {
-            if (data && !data.completed && data.progress_seconds > 5 && audioRef.current) {
-              audioRef.current.currentTime = data.progress_seconds;
+      // Start immediately. Neither Supabase nor a remote `#t=` seek is allowed
+      // to sit between the user's tap and the first audible frame.
+      audio.play().catch(() => {
+        if (isCurrent()) setIsPlaying(false);
+      });
+
+      // For streamed audio the saved position is applied only after playback
+      // has started, so the user hears sound instead of waiting for a second range.
+      if (!source.local && resumeAt > 5) {
+        resumeAfterAudible(audio, resumeAt, isCurrent);
+      }
+
+      // The local cache normally covers resume. Only ask Supabase when it
+      // didn't, and don't seek once the episode is already playing.
+      if (user && resumeAt === 0) {
+        void (async () => {
+          try {
+            const { data } = await supabase
+              .from('listening_history')
+              .select('progress_seconds, completed')
+              .eq('user_id', user.id)
+              .eq('episode_id', episode.id)
+              .maybeSingle();
+            if (!isCurrent()) return;
+            const savedAt = data && !data.completed ? data.progress_seconds : 0;
+            if (savedAt > 5 && audio.currentTime < 1) {
+              if (source.local) seekWhenReady(audio, savedAt, isCurrent);
+              else resumeAfterAudible(audio, savedAt, isCurrent);
             }
-            audioRef.current?.play().catch(() => setIsPlaying(false));
-          });
-      } else {
-        audioRef.current.play().catch(() => setIsPlaying(false));
+          } catch {
+            // Playback already started; losing the saved position is harmless.
+          }
+        })();
       }
     },
     [currentEpisode, playbackRate, user]
@@ -233,6 +383,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const togglePlay = useCallback(() => {
     if (!audioRef.current || !currentEpisode) return;
     if (audioRef.current.paused) {
+      setIsBuffering(true);
       audioRef.current.play().catch(() => setIsPlaying(false));
     } else {
       audioRef.current.pause();
@@ -270,9 +421,17 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     const nextEp = queue[nextIdx];
     setCurrentEpisode(nextEp);
     if (audioRef.current) {
-      audioRef.current.src = resolveAudioUrl(nextEp.audio_url);
-      audioRef.current.playbackRate = playbackRate;
-      audioRef.current.play().catch(() => setIsPlaying(false));
+      const audio = audioRef.current;
+      const token = ++playTokenRef.current;
+      const resumeAt = cachedResumeFor(nextEp.id);
+      const source = sourceFor(nextEp.id, nextEp.audio_url, resumeAt);
+      audio.src = source.url;
+      audio.playbackRate = playbackRate;
+      setIsBuffering(true);
+      audio.play().catch(() => { if (token === playTokenRef.current) setIsPlaying(false); });
+      if (!source.local && resumeAt > 5) {
+        resumeAfterAudible(audio, resumeAt, () => token === playTokenRef.current && audioRef.current === audio);
+      }
     }
   }, [queue, queueIndex, playbackRate]);
 
@@ -283,13 +442,22 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     const prevEp = queue[prevIdx];
     setCurrentEpisode(prevEp);
     if (audioRef.current) {
-      audioRef.current.src = resolveAudioUrl(prevEp.audio_url);
-      audioRef.current.playbackRate = playbackRate;
-      audioRef.current.play().catch(() => setIsPlaying(false));
+      const audio = audioRef.current;
+      const token = ++playTokenRef.current;
+      const resumeAt = cachedResumeFor(prevEp.id);
+      const source = sourceFor(prevEp.id, prevEp.audio_url, resumeAt);
+      audio.src = source.url;
+      audio.playbackRate = playbackRate;
+      setIsBuffering(true);
+      audio.play().catch(() => { if (token === playTokenRef.current) setIsPlaying(false); });
+      if (!source.local && resumeAt > 5) {
+        resumeAfterAudible(audio, resumeAt, () => token === playTokenRef.current && audioRef.current === audio);
+      }
     }
   }, [queue, queueIndex, playbackRate]);
 
   const stop = useCallback(() => {
+    playTokenRef.current += 1;
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.src = '';
@@ -320,6 +488,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         queue,
         queueIndex,
         isPlaying,
+        isBuffering,
         currentTime,
         duration,
         volume,

@@ -5,6 +5,8 @@ import App from './App.tsx';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { AudioPlayerProvider } from '@/context/AudioPlayerContext';
+import { DownloadProvider } from '@/context/DownloadContext';
+import { ProgressProvider } from '@/context/ProgressContext';
 import './index.css';
 
 if ('serviceWorker' in navigator) {
@@ -17,11 +19,15 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
       <AuthProvider>
-        <AudioPlayerProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </AudioPlayerProvider>
+        <DownloadProvider>
+          <ProgressProvider>
+            <AudioPlayerProvider>
+              <BrowserRouter>
+                <App />
+              </BrowserRouter>
+            </AudioPlayerProvider>
+          </ProgressProvider>
+        </DownloadProvider>
       </AuthProvider>
     </ThemeProvider>
   </StrictMode>

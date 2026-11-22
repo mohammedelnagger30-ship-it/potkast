@@ -47,7 +47,7 @@ export default function HomePage() {
     // Fetch listened episodes count
     const { data: listened } = await supabase
       .from('listening_history')
-      .select('id')
+      .select('episode_id')
       .eq('user_id', user.id);
 
     const listenedCount = listened?.length || 0;

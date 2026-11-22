@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Search, Headphones, X, SlidersHorizontal } from 'lucide-react';
 import { Layout } from '@/components/layout';
 import { PodcastCard } from '@/components/PodcastCard';
@@ -13,6 +13,8 @@ import { typeLabels, levelLabels, interestToCategoryMap } from '@/types/podcast'
 
 type FilterType = 'all' | 'religious' | 'scientific' | 'cultural' | 'motivational' | 'professional';
 type FilterLevel = 'all' | 'beginner' | 'intermediate' | 'expert';
+
+const PAGE_SIZE = 24;
 
 export default function PodcastsPage() {
   const { user, profile } = useAuth();
@@ -29,6 +31,13 @@ export default function PodcastsPage() {
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [filterLevel, setFilterLevel] = useState<FilterLevel>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  // Rendering hundreds of covers at once starves the connection and makes
+  // starting playback feel slow. Show a page at a time instead.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [searchQuery, selectedCategory, filterType, filterLevel]);
 
   const fetchPodcasts = useCallback(async () => {
     const [{ data: podcastsData }, { data: categoriesData }, { data: favData }] = await Promise.all([
@@ -95,10 +104,24 @@ export default function PodcastsPage() {
     }
   }, [user, favorites]);
 
+  // The DB currently holds 5 rows per category name (repeated seeds).
+  // Show each name once and keep it working regardless of which duplicate id
+  // a podcast points at.
+  const categoryOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return categories.filter((c) => {
+      if (!c.name_ar || seen.has(c.name_ar)) return false;
+      seen.add(c.name_ar);
+      return true;
+    });
+  }, [categories]);
+
   // Filtered podcasts for search/grid view
   const filteredPodcasts = allPodcasts.filter((p) => {
     if (searchQuery && !p.title.includes(searchQuery) && !p.host_name.includes(searchQuery)) return false;
-    if (selectedCategory !== 'all' && p.category_id !== selectedCategory) return false;
+    // The categories table contains several rows with the same Arabic name,
+    // so filter by the joined name, not by one specific duplicate id.
+    if (selectedCategory !== 'all' && p.category?.name_ar !== selectedCategory) return false;
     if (filterType !== 'all' && p.type !== filterType) return false;
     if (filterLevel !== 'all' && p.audience_level !== filterLevel) return false;
     return true;
@@ -106,15 +129,18 @@ export default function PodcastsPage() {
 
   // Recommended: match user interests to category names
   const recommended = profile?.interests && profile.interests.length > 0
-    ? allPodcasts.filter((p) => {
-        const catName = p.category?.name_ar;
-        return profile.interests.some((interest) => interestToCategoryMap[interest] === catName);
-      })
-    : allPodcasts.slice(0, 10);
+    ? allPodcasts
+        .filter((p) => {
+          const catName = p.category?.name_ar;
+          return profile.interests.some((interest) => interestToCategoryMap[interest] === catName);
+        })
+        .slice(0, 12)
+    : allPodcasts.slice(0, 12);
 
-  // New this week: created in last 7 days
+  // New this week: created in last 7 days. The catalog was imported at once,
+  // so cap the carousel — rendering all 740 covers here delays playback.
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const newThisWeek = allPodcasts.filter((p) => new Date(p.created_at) > weekAgo);
+  const newThisWeek = allPodcasts.filter((p) => new Date(p.created_at) > weekAgo).slice(0, 12);
 
   // Most popular: just use all for now (would need play counts)
   const mostPopular = [...allPodcasts].sort((a, b) => a.title.localeCompare(b.title)).slice(0, 10);
@@ -181,12 +207,12 @@ export default function PodcastsPage() {
           >
             الكل
           </button>
-          {categories.map((cat) => (
+          {categoryOptions.map((cat) => (
             <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
+              key={cat.name_ar}
+              onClick={() => setSelectedCategory(cat.name_ar)}
               className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${
-                selectedCategory === cat.id
+                selectedCategory === cat.name_ar
                   ? 'bg-primary-600 text-white'
                   : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
               }`}
@@ -279,10 +305,18 @@ export default function PodcastsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredPodcasts.map((p) => (
+              {filteredPodcasts.slice(0, visibleCount).map((p) => (
                 <PodcastCard key={p.id} podcast={p} onToggleFavorite={toggleFavorite} />
               ))}
             </div>
+          )}
+          {filteredPodcasts.length > visibleCount && (
+            <button
+              onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-primary-200 bg-primary-50/60 py-3 text-sm font-bold text-primary-700 transition-all hover:border-primary-400 hover:bg-primary-100 dark:border-primary-900 dark:bg-primary-950/20 dark:text-primary-300 dark:hover:bg-primary-900/30"
+            >
+              عرض المزيد ({filteredPodcasts.length - visibleCount} بودكاست متبقٍ)
+            </button>
           )}
         </div>
       ) : (
@@ -302,6 +336,8 @@ export default function PodcastsPage() {
                         <img
                           src={ep.podcast.cover_url}
                           alt={ep.podcast.title}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       )}
@@ -350,10 +386,18 @@ export default function PodcastsPage() {
           <div className="mb-4">
             <h2 className="text-lg font-extrabold text-neutral-900 dark:text-white mb-4">تصفّح الكل</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {allPodcasts.map((p) => (
+              {allPodcasts.slice(0, visibleCount).map((p) => (
                 <PodcastCard key={p.id} podcast={p} onToggleFavorite={toggleFavorite} />
               ))}
             </div>
+            {allPodcasts.length > visibleCount && (
+              <button
+                onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-primary-200 bg-primary-50/60 py-3 text-sm font-bold text-primary-700 transition-all hover:border-primary-400 hover:bg-primary-100 dark:border-primary-900 dark:bg-primary-950/20 dark:text-primary-300 dark:hover:bg-primary-900/30"
+              >
+                عرض المزيد ({allPodcasts.length - visibleCount} بودكاست متبقٍ)
+              </button>
+            )}
           </div>
         </div>
       )}

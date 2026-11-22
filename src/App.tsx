@@ -10,12 +10,15 @@ import MissionsPage from '@/pages/MissionsPage';
 import ProgressPage from '@/pages/ProgressPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 import ProfilePage from '@/pages/ProfilePage';
+import SettingsPage from '@/pages/SettingsPage';
 import NotificationSettingsPage from '@/pages/NotificationSettingsPage';
 import JournalPage from '@/pages/JournalPage';
 import LifeWheelPage from '@/pages/LifeWheelPage';
 import LearningPathsPage from '@/pages/LearningPathsPage';
 import LeaderboardPage from '@/pages/LeaderboardPage';
 import AchievementsPage from '@/pages/AchievementsPage';
+import DownloadsPage from '@/pages/DownloadsPage';
+import PlayerPage from '@/pages/PlayerPage';
 import AuthPage from '@/pages/AuthPage';
 import OnboardingPage from '@/pages/OnboardingPage';
 import type { ReactNode } from 'react';
@@ -124,6 +127,26 @@ function App() {
         }
       />
       <Route
+        path="/downloads"
+        element={
+          <ProtectedRoute>
+            <OnboardingGuard>
+              <DownloadsPage />
+            </OnboardingGuard>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/player"
+        element={
+          <ProtectedRoute>
+            <OnboardingGuard>
+              <PlayerPage />
+            </OnboardingGuard>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/notifications"
         element={
           <ProtectedRoute>
@@ -139,6 +162,16 @@ function App() {
           <ProtectedRoute>
             <OnboardingGuard>
               <ProfilePage />
+            </OnboardingGuard>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <OnboardingGuard>
+              <SettingsPage />
             </OnboardingGuard>
           </ProtectedRoute>
         }

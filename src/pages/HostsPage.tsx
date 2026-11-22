@@ -46,22 +46,20 @@ export default function HostsPage() {
   }, [fetchHosts]);
 
   // Only categories that actually have hosts, de-duplicated by Arabic name
-  // (the categories table holds several rows per name).
+  // (the categories table holds several rows per name). Use the name itself
+  // as the filter value so all duplicate-id rows are included together.
   const categoryOptions = useMemo(() => {
-    const map = new Map<string, { id: string; name: string }>();
+    const names = new Set<string>();
     for (const h of hosts) {
-      if (!h.category_id || !h.category) continue;
-      if (!map.has(h.category.name_ar)) {
-        map.set(h.category.name_ar, { id: h.category_id, name: h.category.name_ar });
-      }
+      if (h.category?.name_ar) names.add(h.category.name_ar);
     }
-    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    return [...names].sort((a, b) => a.localeCompare(b, 'ar'));
   }, [hosts]);
 
   const filtered = hosts
     .filter((h) => {
       if (searchQuery && !h.name_ar.includes(searchQuery) && !h.specialty_ar.includes(searchQuery)) return false;
-      if (selectedCategory !== 'all' && h.category_id !== selectedCategory) return false;
+      if (selectedCategory !== 'all' && h.category?.name_ar !== selectedCategory) return false;
       return true;
     })
     .sort((a, b) => {
@@ -134,17 +132,17 @@ export default function HostsPage() {
         >
           الكل
         </button>
-        {categoryOptions.map((cat) => (
+        {categoryOptions.map((name) => (
           <button
-            key={cat.id}
-            onClick={() => setSelectedCategory(cat.id)}
+            key={name}
+            onClick={() => setSelectedCategory(name)}
             className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${
-              selectedCategory === cat.id
+              selectedCategory === name
                 ? 'bg-primary-600 text-white'
                 : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
             }`}
           >
-            {cat.name}
+            {name}
           </button>
         ))}
       </div>

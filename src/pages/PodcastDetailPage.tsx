@@ -16,11 +16,13 @@ import {
   BadgeCheck,
   Headphones,
   Star,
+  BookOpen,
 } from 'lucide-react';
 import { Layout } from '@/components/layout';
 import { Badge, Button, Card } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
+import { DownloadButton, DownloadPodcastButton } from '@/components/DownloadButton';
 import { supabase } from '@/lib/supabase';
 import type { Podcast, Episode, ListeningHistory } from '@/types/podcast';
 import type { EpisodeBookmark, EpisodeNote } from '@/types/features';
@@ -33,6 +35,21 @@ import {
 } from '@/types/podcast';
 
 const EPISODES_PER_PAGE = 40;
+
+/** RSS descriptions often arrive as HTML; show clean text, never raw tags. */
+function plainText(value: string | null | undefined): string {
+  return String(value || '')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<\/(p|div|li|h\d)>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&#x27;/gi, "'")
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code)))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 export default function PodcastDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -51,6 +68,7 @@ export default function PodcastDetailPage() {
   const [bookmarkNote, setBookmarkNote] = useState('');
   const [bookmarkTime, setBookmarkTime] = useState('0:00');
   const [visibleEpisodes, setVisibleEpisodes] = useState(EPISODES_PER_PAGE);
+  const [descExpanded, setDescExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -70,6 +88,7 @@ export default function PodcastDetailPage() {
         return;
       }
       setPodcast(podData as Podcast);
+      setDescExpanded(false);
 
       const { data: epData } = await supabase
         .from('episodes')
@@ -209,6 +228,8 @@ export default function PodcastDetailPage() {
     );
   }
 
+  const cleanDescription = plainText(podcast.description);
+
   return (
     <Layout title="البودكاست">
       {/* Back button */}
@@ -263,8 +284,8 @@ export default function PodcastDetailPage() {
               </p>
             </div>
 
-            {/* Favorite */}
-            <div className="sm:pt-2">
+            {/* Favorite + offline download */}
+            <div className="sm:pt-2 flex flex-col gap-2">
               <button
                 onClick={toggleFavorite}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all ${
@@ -276,14 +297,34 @@ export default function PodcastDetailPage() {
                 <Heart size={18} fill={isFavorited ? 'currentColor' : 'none'} />
                 {isFavorited ? 'في المفضلة' : 'أضف للمفضلة'}
               </button>
+              <DownloadPodcastButton podcastId={podcast.id} count={episodes.length} />
             </div>
           </div>
 
           {/* Description */}
-          {podcast.description && (
-            <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed mt-4">
-              {podcast.description}
-            </p>
+          {cleanDescription && (
+            <div className="relative mt-5 overflow-hidden rounded-2xl border border-primary-100 dark:border-primary-900/40 bg-gradient-to-l from-primary-50/80 via-white to-white dark:from-primary-950/30 dark:via-neutral-900 dark:to-neutral-900">
+              <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-primary-200/50 dark:bg-primary-800/20 blur-2xl" />
+              <div className="relative p-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-300">
+                    <BookOpen size={16} />
+                  </span>
+                  <h2 className="text-sm font-extrabold text-neutral-900 dark:text-white">عن هذا البودكاست</h2>
+                </div>
+                <p className={`text-[13px] leading-7 text-neutral-600 dark:text-neutral-300 ${descExpanded ? '' : 'line-clamp-3'}`}>
+                  {cleanDescription}
+                </p>
+                {cleanDescription.length > 160 && (
+                  <button
+                    onClick={() => setDescExpanded((v) => !v)}
+                    className="mt-2 text-xs font-bold text-primary-600 dark:text-primary-400 hover:underline"
+                  >
+                    {descExpanded ? 'عرض أقل' : 'اقرأ المزيد'}
+                  </button>
+                )}
+              </div>
+            </div>
           )}
 
           {podcast.host?.slug ? (
@@ -342,11 +383,22 @@ export default function PodcastDetailPage() {
       </div>
 
       {/* Episodes list */}
-      <div className="mb-4">
-        <h2 className="text-lg font-extrabold text-neutral-900 dark:text-white mb-4">الحلقات</h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-600 text-white shadow-lg shadow-primary-600/20">
+            <Headphones size={20} />
+          </span>
+          <div>
+            <h2 className="text-lg font-extrabold text-neutral-900 dark:text-white">الحلقات</h2>
+            <p className="mt-0.5 text-xs text-neutral-400">استمع بترتيبك، وكمّل من حيث ما وقفت</p>
+          </div>
+        </div>
+        <span className="rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+          {episodes.length} حلقة
+        </span>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         {episodes.slice(0, visibleEpisodes).map((ep, idx) => {
           const isCurrent = currentEpisode?.id === ep.id;
           const hist = historyMap.get(ep.id);
@@ -358,79 +410,99 @@ export default function PodcastDetailPage() {
           return (
             <div
               key={ep.id}
-              className={`card-base p-4 transition-all animate-fade-in-up ${
-                isCurrent ? 'ring-2 ring-primary-500' : ''
+              className={`group relative card-base overflow-hidden transition-all animate-fade-in-up hover:shadow-card-hover ${
+                isCurrent ? 'ring-2 ring-primary-500' : 'hover:-translate-y-0.5'
               }`}
-              style={{ animationDelay: `${idx * 50}ms` }}
+              style={{ animationDelay: `${idx * 40}ms` }}
             >
-              <div className="flex items-center gap-4">
-              {/* Play button */}
-              <button
-                onClick={() => handlePlayEpisode(ep)}
-                disabled={!ep.audio_url}
-                className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed ${
-                  isCurrent
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-600 hover:text-white'
-                }`}
-              >
-                {isCurrent && isPlaying ? (
-                  <Pause size={20} fill="currentColor" />
-                ) : (
-                  <Play size={20} fill="currentColor" className="mr-0.5" />
-                )}
-              </button>
+              {isCurrent && <span className="absolute right-0 top-0 h-full w-1 bg-primary-500" />}
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  {isCompleted && (
-                    <CheckCircle2 size={16} className="text-success-500 flex-shrink-0" />
-                  )}
-                  <h3 className="font-bold text-neutral-900 dark:text-neutral-100 truncate">{ep.title}</h3>
-                </div>
-                {ep.description && (
-                  <p className="text-sm text-neutral-500 dark:text-neutral-400 line-clamp-1">{ep.description}</p>
-                )}
-                <div className="flex items-center gap-3 mt-1">
-                  <span className="flex items-center gap-1 text-xs text-neutral-400">
-                    <Clock size={12} />
-                    {formatDuration(ep.duration_seconds)}
+              <div className="flex items-center gap-3.5 p-3.5 sm:p-4">
+                {/* Play + episode number */}
+                <div className="relative flex-shrink-0">
+                  <button
+                    onClick={() => handlePlayEpisode(ep)}
+                    disabled={!ep.audio_url}
+                    aria-label={isCurrent && isPlaying ? 'إيقاف مؤقت' : 'تشغيل الحلقة'}
+                    className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all active:scale-90 disabled:cursor-not-allowed disabled:opacity-40 ${
+                      isCurrent
+                        ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/25'
+                        : 'bg-primary-50 text-primary-600 group-hover:bg-primary-600 group-hover:text-white dark:bg-primary-900/30 dark:text-primary-400'
+                    }`}
+                  >
+                    {isCurrent && isPlaying ? (
+                      <Pause size={20} fill="currentColor" />
+                    ) : (
+                      <Play size={20} fill="currentColor" className="mr-0.5" />
+                    )}
+                  </button>
+                  <span className="absolute -left-1.5 -top-1.5 flex min-w-[20px] items-center justify-center rounded-full border border-neutral-200 bg-white px-1 text-[10px] font-extrabold text-neutral-500 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
+                    {idx + 1}
                   </span>
-                  <span className="text-xs text-neutral-400">{formatRelativeTime(ep.published_at)}</span>
+                </div>
+
+                {/* Info */}
+                <div className="min-w-0 flex-1">
+                  <div className="mb-0.5 flex items-center gap-2">
+                    {isCompleted && <CheckCircle2 size={15} className="flex-shrink-0 text-success-500" />}
+                    <h3 className="truncate text-sm font-extrabold text-neutral-900 dark:text-neutral-100">
+                      {ep.title}
+                    </h3>
+                  </div>
+                  {ep.description && (
+                    <p className="line-clamp-1 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
+                      {plainText(ep.description)}
+                    </p>
+                  )}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    {ep.duration_seconds > 0 && (
+                      <span className="flex items-center gap-1 text-[11px] text-neutral-400">
+                        <Clock size={12} />
+                        {formatDuration(ep.duration_seconds)}
+                      </span>
+                    )}
+                    <span className="text-[11px] text-neutral-400">{formatRelativeTime(ep.published_at)}</span>
+                    {isCompleted && (
+                      <span className="text-[11px] font-bold text-success-500">مكتملة</span>
+                    )}
+                  </div>
                   {progressPct > 0 && !isCompleted && (
-                    <span className="text-xs text-primary-600 dark:text-primary-400 font-semibold">
-                      {Math.round(progressPct)}% مكتمل
-                    </span>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-l from-primary-500 to-accent-500"
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-extrabold text-primary-600 dark:text-primary-400">
+                        {Math.round(progressPct)}%
+                      </span>
+                    </div>
                   )}
                 </div>
-                {/* Progress bar for in-progress episodes */}
-                {progressPct > 0 && !isCompleted && (
-                  <div className="mt-1.5 h-1 bg-neutral-200 dark:bg-neutral-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary-600 rounded-full"
-                      style={{ width: `${progressPct}%` }}
-                    />
-                  </div>
-                )}
-              </div>
 
-              {/* Expand button */}
-              <button
-                onClick={() => {
-                  setExpandedEp(expandedEp === ep.id ? null : ep.id);
-                  const epNote = notes.find((n) => n.episode_id === ep.id);
-                  setNoteText(epNote?.content || '');
-                }}
-                className="flex-shrink-0 text-neutral-400 hover:text-primary-600 transition-colors p-1"
-              >
-                <ChevronDown size={18} className={`transition-transform ${expandedEp === ep.id ? 'rotate-180' : ''}`} />
-              </button>
+                {/* Offline download */}
+                <div className="flex flex-shrink-0 items-center gap-1.5">
+                  <DownloadButton episode={ep} podcast={podcast} compact />
+
+                  {/* Expand button */}
+                  <button
+                    onClick={() => {
+                      setExpandedEp(expandedEp === ep.id ? null : ep.id);
+                      const epNote = notes.find((n) => n.episode_id === ep.id);
+                      setNoteText(epNote?.content || '');
+                    }}
+                    aria-label={expandedEp === ep.id ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-primary-600 dark:hover:bg-neutral-800"
+                  >
+                    <ChevronDown size={17} className={`transition-transform ${expandedEp === ep.id ? 'rotate-180' : ''}`} />
+                  </button>
+                </div>
               </div>
 
               {/* Expanded section: bookmarks & notes */}
               {expandedEp === ep.id && (
-                <div className="mt-4 pt-4 border-t border-neutral-100 dark:border-neutral-800 space-y-4 animate-fade-in">
+                <div className="space-y-4 border-t border-neutral-100 px-3.5 pb-3.5 pt-4 animate-fade-in dark:border-neutral-800 sm:px-4 sm:pb-4">
                   {/* Bookmarks */}
                   <div>
                     <p className="text-xs font-bold text-neutral-500 dark:text-neutral-400 mb-2 flex items-center gap-1">
@@ -516,8 +588,9 @@ export default function PodcastDetailPage() {
       {episodes.length > visibleEpisodes && (
         <button
           onClick={() => setVisibleEpisodes((v) => v + EPISODES_PER_PAGE)}
-          className="mt-3 w-full py-3 rounded-xl text-sm font-bold bg-neutral-100 dark:bg-neutral-800 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-primary-200 bg-primary-50/60 py-3 text-sm font-bold text-primary-700 transition-all hover:border-primary-400 hover:bg-primary-100 dark:border-primary-900 dark:bg-primary-950/20 dark:text-primary-300 dark:hover:bg-primary-900/30"
         >
+          <ChevronDown size={16} />
           عرض المزيد ({episodes.length - visibleEpisodes} حلقة متبقية)
         </button>
       )}

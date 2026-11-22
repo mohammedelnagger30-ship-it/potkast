@@ -54,7 +54,7 @@ export default function AchievementsPage() {
 
     const { data: listened } = await supabase
       .from('listening_history')
-      .select('id')
+      .select('episode_id')
       .eq('user_id', user.id);
 
     const allDates = (completed || [])

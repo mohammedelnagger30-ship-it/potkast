@@ -5,6 +5,24 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Button } from '@/components/ui';
 
+function isAlreadyRegistered(message: string) {
+  const text = message.toLowerCase();
+  return text.includes('already registered')
+    || text.includes('already exists')
+    || text.includes('already been registered')
+    || text.includes('موجود');
+}
+
+function friendlyError(message: string) {
+  if (isAlreadyRegistered(message)) {
+    return 'الحساب ده موجود بالفعل. سجّل الدخول بدل ما تعمل حساب جديد.';
+  }
+  if (message.toLowerCase().includes('invalid login credentials')) {
+    return 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
+  }
+  return message;
+}
+
 export default function AuthPage() {
   const { signIn, signUp, signInWithGoogle } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -31,17 +49,27 @@ export default function AuthPage() {
         setSubmitting(false);
         return;
       }
-      const { error, needsConfirmation } = await signUp(email, password, name.trim());
-      if (error) {
-        setError(error);
+      const { error: signUpError, needsConfirmation } = await signUp(email, password, name.trim());
+      if (signUpError) {
+        setError(friendlyError(signUpError));
+        if (isAlreadyRegistered(signUpError)) setMode('login');
       } else if (needsConfirmation) {
-        setNotice('تم إنشاء حسابك بنجاح. افتح بريدك الإلكتروني واضغط رابط التأكيد، ثم سجّل الدخول.');
+        setNotice(`تم إنشاء حسابك (${email}) بنجاح. افتح بريدك الإلكتروني واضغط رابط التأكيد، ثم سجّل الدخول.`);
+        setMode('login');
+      } else {
+        // Email confirmation is off: Supabase already signed the user in.
+        // Go straight into the app (OnboardingGuard handles first-time setup).
+        navigate('/', { replace: true });
+        return;
       }
       setSubmitting(false);
     } else {
-      const { error } = await signIn(email, password);
-      if (error) {
-        setError(error);
+      const { error: signInError } = await signIn(email, password);
+      if (signInError) {
+        setError(friendlyError(signInError));
+      } else {
+        navigate('/', { replace: true });
+        return;
       }
       setSubmitting(false);
     }

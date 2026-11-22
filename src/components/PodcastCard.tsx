@@ -1,6 +1,8 @@
-import { Link } from 'react-router-dom';
-import { Play, Pause, Heart, BadgeCheck } from 'lucide-react';
-import type { Podcast } from '@/types/podcast';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Play, Pause, Heart, BadgeCheck, Loader2 } from 'lucide-react';
+import type { Podcast, Episode } from '@/types/podcast';
+import { supabase } from '@/lib/supabase';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { Badge } from '@/components/ui';
 import { typeLabels, levelLabels } from '@/types/podcast';
@@ -11,16 +13,72 @@ interface PodcastCardProps {
   compact?: boolean;
 }
 
+// One lightweight lookup per podcast, reused on hover and on the actual click.
+// This removes the Supabase round-trip from the click path on desktop.
+const episodesCache = new Map<string, Promise<Episode[]>>();
+const resolvedEpisodes = new Map<string, Episode[]>();
+
+function episodesFor(podcastId: string): Promise<Episode[]> {
+  let request = episodesCache.get(podcastId);
+  if (!request) {
+    request = Promise.resolve(
+      supabase
+        .from('episodes')
+        .select('id,podcast_id,title,audio_url,duration_seconds,published_at')
+        .eq('podcast_id', podcastId)
+        .order('published_at', { ascending: false })
+        .limit(20)
+        .then(({ data }) => {
+          const list = (data || []) as Episode[];
+          resolvedEpisodes.set(podcastId, list);
+          return list;
+        })
+    );
+    episodesCache.set(podcastId, request);
+  }
+  return request;
+}
+
+/** Synchronous fast path: no click should ever wait for the episode lookup. */
+function firstPlayable(podcastId: string): Episode | undefined {
+  const list = resolvedEpisodes.get(podcastId);
+  return list?.find((ep) => ep.audio_url);
+}
+
 export function PodcastCard({ podcast, onToggleFavorite, compact = false }: PodcastCardProps) {
+  const navigate = useNavigate();
   const { currentEpisode, isPlaying, togglePlay, currentPodcast, playEpisode } = useAudioPlayer();
+  const [starting, setStarting] = useState(false);
 
   const isCurrentPodcast = currentPodcast?.id === podcast.id;
 
-  const handlePlay = (e: React.MouseEvent) => {
+  const handlePlay = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
     if (isCurrentPodcast && currentEpisode) {
       togglePlay();
+      return;
+    }
+    if (starting) return;
+
+    // Use the warmed episode list when available. Awaiting Supabase inside the
+    // click handler used to delay `audio.play()` by hundreds of milliseconds
+    // (and could lose the browser's user activation on touch devices).
+    const known = resolvedEpisodes.get(podcast.id);
+    const knownFirst = firstPlayable(podcast.id);
+    if (known && knownFirst) {
+      playEpisode(knownFirst, podcast, known);
+      return;
+    }
+
+    setStarting(true);
+    try {
+      const list = await episodesFor(podcast.id);
+      const first = list.find((ep) => ep.audio_url);
+      if (first) playEpisode(first, podcast, list);
+    } finally {
+      setStarting(false);
     }
   };
 
@@ -33,6 +91,14 @@ export function PodcastCard({ podcast, onToggleFavorite, compact = false }: Podc
   const hostLink = podcast.host?.slug ? `/hosts/${podcast.host.slug}` : null;
   const hostName = podcast.host?.name_ar || podcast.host_name;
 
+  // The whole card is already a <Link>; nesting another <a> inside it is
+  // invalid HTML, so navigate in JS from a span that looks like a link.
+  const openHost = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (hostLink) navigate(hostLink);
+  };
+
   if (compact) {
     return (
       <Link
@@ -44,26 +110,41 @@ export function PodcastCard({ podcast, onToggleFavorite, compact = false }: Podc
             <img
               src={podcast.cover_url}
               alt={podcast.title}
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
           )}
           <button
             onClick={handlePlay}
-            className="absolute bottom-2 left-2 w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-lg active:scale-90"
+            onMouseEnter={() => { void episodesFor(podcast.id); }}
+            onFocus={() => { void episodesFor(podcast.id); }}
+            onTouchStart={() => { void episodesFor(podcast.id); }}
+            disabled={starting}
+            aria-label={isCurrentPodcast && isPlaying ? 'إيقاف مؤقت' : 'تشغيل البودكاست'}
+            className="absolute bottom-2 left-2 flex h-10 w-10 items-center justify-center rounded-full bg-primary-600 text-white opacity-100 shadow-lg transition-all duration-200 active:scale-90 disabled:opacity-70 sm:opacity-0 sm:group-hover:opacity-100"
           >
-            {isCurrentPodcast && isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="mr-0.5" />}
+            {starting ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : isCurrentPodcast && isPlaying ? (
+              <Pause size={18} fill="currentColor" />
+            ) : (
+              <Play size={18} fill="currentColor" className="mr-0.5" />
+            )}
           </button>
         </div>
         <h3 className="text-sm font-bold text-neutral-900 dark:text-white truncate">{podcast.title}</h3>
         {hostLink ? (
-          <Link
-            to={hostLink}
-            onClick={(e) => e.stopPropagation()}
-            className="text-xs text-neutral-500 dark:text-neutral-400 truncate hover:text-primary-600 dark:hover:text-primary-400 transition-colors inline-flex items-center gap-0.5"
+          <span
+            role="link"
+            tabIndex={0}
+            onClick={openHost}
+            onKeyDown={(e) => { if (e.key === 'Enter') openHost(e); }}
+            className="text-xs text-neutral-500 dark:text-neutral-400 truncate hover:text-primary-600 dark:hover:text-primary-400 transition-colors inline-flex items-center gap-0.5 cursor-pointer"
           >
             {hostName}
             {podcast.host?.is_verified && <BadgeCheck size={11} className="text-primary-600 flex-shrink-0" />}
-          </Link>
+          </span>
         ) : (
           <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">{hostName}</p>
         )}
@@ -81,14 +162,27 @@ export function PodcastCard({ podcast, onToggleFavorite, compact = false }: Podc
           <img
             src={podcast.cover_url}
             alt={podcast.title}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         )}
         <button
           onClick={handlePlay}
-          className="absolute bottom-2 left-2 w-11 h-11 rounded-full bg-primary-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-lg active:scale-90"
+          onMouseEnter={() => { void episodesFor(podcast.id); }}
+          onFocus={() => { void episodesFor(podcast.id); }}
+          onTouchStart={() => { void episodesFor(podcast.id); }}
+          disabled={starting}
+          aria-label={isCurrentPodcast && isPlaying ? 'إيقاف مؤقت' : 'تشغيل البودكاست'}
+          className="absolute bottom-2 left-2 flex h-11 w-11 items-center justify-center rounded-full bg-primary-600 text-white opacity-100 shadow-lg transition-all duration-200 active:scale-90 disabled:opacity-70 sm:opacity-0 sm:group-hover:opacity-100"
         >
-          {isCurrentPodcast && isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="mr-0.5" />}
+          {starting ? (
+            <Loader2 size={20} className="animate-spin" />
+          ) : isCurrentPodcast && isPlaying ? (
+            <Pause size={20} fill="currentColor" />
+          ) : (
+            <Play size={20} fill="currentColor" className="mr-0.5" />
+          )}
         </button>
         {onToggleFavorite && (
           <button
@@ -109,14 +203,16 @@ export function PodcastCard({ podcast, onToggleFavorite, compact = false }: Podc
       </div>
       <h3 className="font-bold text-neutral-900 dark:text-white truncate">{podcast.title}</h3>
       {hostLink ? (
-        <Link
-          to={hostLink}
-          onClick={(e) => e.stopPropagation()}
-          className="text-sm text-neutral-500 dark:text-neutral-400 truncate hover:text-primary-600 dark:hover:text-primary-400 transition-colors inline-flex items-center gap-1"
+        <span
+          role="link"
+          tabIndex={0}
+          onClick={openHost}
+          onKeyDown={(e) => { if (e.key === 'Enter') openHost(e); }}
+          className="text-sm text-neutral-500 dark:text-neutral-400 truncate hover:text-primary-600 dark:hover:text-primary-400 transition-colors inline-flex items-center gap-1 cursor-pointer"
         >
           {hostName}
           {podcast.host?.is_verified && <BadgeCheck size={13} className="text-primary-600 flex-shrink-0" />}
-        </Link>
+        </span>
       ) : (
         <p className="text-sm text-neutral-500 dark:text-neutral-400 truncate">{hostName}</p>
       )}

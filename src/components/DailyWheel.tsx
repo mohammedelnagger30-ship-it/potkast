@@ -6,14 +6,14 @@ import { useAuth } from '@/context/AuthContext';
 import type { WheelSpin } from '@/types/features';
 
 const segments = [
-  { type: 'xp', amount: 50, label: '+50 نقطة', color: '#0F766E', icon: Zap },
-  { type: 'tip', amount: 0, label: 'نصيحة خاصة', color: '#D4A017', icon: Lightbulb },
-  { type: 'xp', amount: 100, label: '+100 نقطة', color: '#10B981', icon: Zap },
-  { type: 'mission', amount: 0, label: 'مهمة مفاجئة', color: '#F97316', icon: Target },
-  { type: 'xp', amount: 25, label: '+25 نقطة', color: '#0EA5E9', icon: Zap },
-  { type: 'streak_shield', amount: 1, label: 'درع السلسلة', color: '#8B5CF6', icon: Shield },
-  { type: 'xp', amount: 75, label: '+75 نقطة', color: '#EF4444', icon: Zap },
-  { type: 'xp', amount: 200, label: '+200 نقطة', color: '#F59E0B', icon: Sparkles },
+  { type: 'xp', amount: 50, label: '+50 نقطة', top: '+50', bottom: 'نقطة', color: '#0D9488', light: '#2DD4BF', icon: Zap },
+  { type: 'tip', amount: 0, label: 'نصيحة خاصة', top: 'نصيحة', bottom: 'خاصة', color: '#D97706', light: '#FBBF24', icon: Lightbulb },
+  { type: 'xp', amount: 100, label: '+100 نقطة', top: '+100', bottom: 'نقطة', color: '#059669', light: '#34D399', icon: Zap },
+  { type: 'mission', amount: 0, label: 'مهمة مفاجئة', top: 'مهمة', bottom: 'مفاجئة', color: '#EA580C', light: '#FB923C', icon: Target },
+  { type: 'xp', amount: 25, label: '+25 نقطة', top: '+25', bottom: 'نقطة', color: '#0284C7', light: '#38BDF8', icon: Zap },
+  { type: 'streak_shield', amount: 1, label: 'درع السلسلة', top: 'درع', bottom: 'السلسلة', color: '#7C3AED', light: '#A78BFA', icon: Shield },
+  { type: 'xp', amount: 75, label: '+75 نقطة', top: '+75', bottom: 'نقطة', color: '#E11D48', light: '#FB7185', icon: Zap },
+  { type: 'xp', amount: 200, label: '+200 نقطة', top: '+200', bottom: 'نقطة', color: '#B45309', light: '#FCD34D', icon: Sparkles },
 ] as const;
 
 export function DailyWheel() {
@@ -116,14 +116,14 @@ export function DailyWheel() {
       />
 
       <div className="flex flex-col items-center">
-        <div className="relative w-56 h-56 mb-4">
+        <div className="relative w-60 h-60 sm:w-64 sm:h-64 mb-4">
           {/* Pointer */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 z-10 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[16px] border-l-transparent border-r-transparent border-t-neutral-900 dark:border-t-white" />
+          <div className="absolute -top-1 left-1/2 -translate-x-1/2 z-20 w-0 h-0 border-l-[11px] border-r-[11px] border-t-[18px] border-l-transparent border-r-transparent border-t-primary-600 drop-shadow-md" />
 
           {/* Wheel */}
           <div
             ref={wheelRef}
-            className="w-full h-full rounded-full overflow-hidden border-4 border-neutral-200 dark:border-neutral-700 shadow-lg transition-transform"
+            className="w-full h-full rounded-full overflow-hidden border-[6px] border-white dark:border-neutral-800 ring-4 ring-primary-500/10 shadow-xl transition-transform"
             style={{
               transform: `rotate(${rotation}deg)`,
               transitionDuration: spinning ? '4s' : '0s',
@@ -131,6 +131,28 @@ export function DailyWheel() {
             }}
           >
             <svg viewBox="0 0 200 200" className="w-full h-full">
+              <defs>
+                {segments.map((seg, i) => (
+                  <linearGradient key={i} id={`wheel-seg-${i}`} x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor={seg.light} />
+                    <stop offset="100%" stopColor={seg.color} />
+                  </linearGradient>
+                ))}
+                <linearGradient id="wheel-rim" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#CBD5E1" />
+                  <stop offset="50%" stopColor="#FFFFFF" />
+                  <stop offset="100%" stopColor="#94A3B8" />
+                </linearGradient>
+                <radialGradient id="wheel-gloss" cx="35%" cy="25%" r="75%">
+                  <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.38" />
+                  <stop offset="70%" stopColor="#FFFFFF" stopOpacity="0" />
+                </radialGradient>
+                <linearGradient id="wheel-hub" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#14B8A6" />
+                  <stop offset="100%" stopColor="#4F46E5" />
+                </linearGradient>
+              </defs>
+
               {segments.map((seg, i) => {
                 const startAngle = i * segmentAngle - 90;
                 const endAngle = (i + 1) * segmentAngle - 90;
@@ -142,31 +164,58 @@ export function DailyWheel() {
                 const y2 = 100 + 90 * Math.sin(endRad);
                 const midAngle = (startAngle + endAngle) / 2;
                 const midRad = (midAngle * Math.PI) / 180;
-                const tx = 100 + 50 * Math.cos(midRad);
-                const ty = 100 + 50 * Math.sin(midRad);
+                const tx = 100 + 56 * Math.cos(midRad);
+                const ty = 100 + 56 * Math.sin(midRad);
                 return (
                   <g key={i}>
                     <path
                       d={`M100,100 L${x1},${y1} A90,90 0 0,1 ${x2},${y2} Z`}
-                      fill={seg.color}
-                      opacity={0.85}
+                      fill={`url(#wheel-seg-${i})`}
+                      stroke="rgba(255,255,255,0.8)"
+                      strokeWidth="1.4"
                     />
                     <text
                       x={tx}
                       y={ty}
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      fill="white"
-                      fontSize="7"
-                      fontWeight="bold"
-                      transform={`rotate(${midAngle + 90}, ${tx}, ${ty})`}
+                      fill="#FFFFFF"
+                      fontWeight="800"
+                      paintOrder="stroke"
+                      stroke="rgba(15,23,42,0.22)"
+                      strokeWidth="0.6"
                     >
-                      {seg.label}
+                      <tspan x={tx} dy="-4" fontSize="9">{seg.top}</tspan>
+                      <tspan x={tx} dy="10" fontSize="7.5">{seg.bottom}</tspan>
                     </text>
                   </g>
                 );
               })}
-              <circle cx="100" cy="100" r="12" fill="white" />
+
+              {/* Gloss + rims */}
+              <circle cx="100" cy="100" r="90" fill="url(#wheel-gloss)" pointerEvents="none" />
+              <circle cx="100" cy="100" r="78" fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="1" />
+              <circle cx="100" cy="100" r="94" fill="none" stroke="url(#wheel-rim)" strokeWidth="4" />
+
+              {/* Segment ticks */}
+              {segments.map((_, i) => {
+                const rad = ((i * segmentAngle - 90) * Math.PI) / 180;
+                return (
+                  <circle
+                    key={i}
+                    cx={100 + 98 * Math.cos(rad)}
+                    cy={100 + 98 * Math.sin(rad)}
+                    r="2"
+                    fill="#FFFFFF"
+                    opacity="0.9"
+                  />
+                );
+              })}
+
+              {/* Hub */}
+              <circle cx="100" cy="100" r="19" fill="#FFFFFF" opacity="0.96" />
+              <circle cx="100" cy="100" r="14" fill="url(#wheel-hub)" />
+              <text x="100" y="101" textAnchor="middle" dominantBaseline="middle" fill="#FFFFFF" fontSize="13" fontWeight="bold">★</text>
             </svg>
           </div>
         </div>
