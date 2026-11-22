@@ -1,4 +1,4 @@
-# Nammy — منصة بودكاست عربية
+# Sada — منصة بودكاست عربية
 
 واجهة React + Vite + Tailwind، والبيانات على Supabase.
 

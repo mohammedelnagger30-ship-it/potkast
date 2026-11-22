@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.potkast.app',
-  appName: 'Potkast',
+  appName: 'Sada',
   webDir: 'dist'
 };
 
