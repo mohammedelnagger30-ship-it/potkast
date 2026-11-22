@@ -3,6 +3,7 @@ import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
 import { Header } from './Header';
 import { AudioPlayer } from '@/components/AudioPlayer';
+import { UpdatePrompt } from '@/components/updates/UpdatePrompt';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 
 interface LayoutProps {
@@ -36,6 +37,9 @@ export function Layout({ title, children }: LayoutProps) {
 
       {/* Persistent audio player (stays across page navigation) */}
       <AudioPlayer />
+
+      {/* One-time prompt when a newer release is published */}
+      <UpdatePrompt />
     </div>
   );
 }

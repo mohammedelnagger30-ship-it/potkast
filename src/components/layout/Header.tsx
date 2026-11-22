@@ -1,9 +1,12 @@
-import { Moon, Sun, Bell, Settings2, UserRound } from 'lucide-react';
+import { Moon, Sun, Bell, Download, Settings2, UserRound } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
+import { useUpdate } from '@/context/UpdateContext';
 import { Link } from 'react-router-dom';
 
 export function Header({ title }: { title: string }) {
   const { theme, toggleTheme } = useTheme();
+  const { available, dismissed } = useUpdate();
+  const hasUpdate = available && !dismissed;
 
   return (
     <header className="sticky top-0 z-40 glass-effect border-b border-neutral-200 dark:border-neutral-800">
@@ -11,6 +14,17 @@ export function Header({ title }: { title: string }) {
         <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">{title}</h2>
 
         <div className="flex items-center gap-2">
+          <Link
+            to="/updates"
+            className="relative flex items-center justify-center w-10 h-10 rounded-xl text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800 transition-all duration-200"
+            aria-label={hasUpdate ? 'تحديث متاح للتطبيق' : 'تحديثات التطبيق'}
+            title={hasUpdate ? 'نسخة جديدة متاحة' : 'تحديثات التطبيق'}
+          >
+            <Download size={20} />
+            {hasUpdate && (
+              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-accent-500 rounded-full ring-2 ring-white dark:ring-neutral-900 animate-pulse" />
+            )}
+          </Link>
           <Link
             to="/notifications"
             className="relative flex items-center justify-center w-10 h-10 rounded-xl text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800 transition-all duration-200"

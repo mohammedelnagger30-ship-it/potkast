@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Award, Bell, BookHeart, Calendar, CircleDot, LogOut, Moon, Route,
+  Award, Bell, BookHeart, Calendar, CircleDot, Download, LogOut, Moon, Route,
   Settings2, Trophy, Zap,
 } from 'lucide-react';
 import { Layout } from '@/components/layout';
@@ -12,6 +12,7 @@ import { UserPathsCard } from '@/components/profile/UserPathsCard';
 import { AppearanceCard } from '@/components/settings/AppearanceCard';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useUpdate } from '@/context/UpdateContext';
 import { supabase } from '@/lib/supabase';
 import { achievementDefs } from '@/lib/gamification';
 
@@ -23,11 +24,13 @@ const quickLinks = [
   { icon: Route, label: 'مسارات التعلّم', to: '/learning-paths' },
   { icon: Trophy, label: 'لوحة المتصدّرين', to: '/leaderboard' },
   { icon: Bell, label: 'إعدادات الإشعارات', to: '/notifications/settings' },
+  { icon: Download, label: 'تحديثات التطبيق', to: '/updates' },
 ];
 
 export default function ProfilePage() {
   const { user, profile, signOut } = useAuth();
   const { theme } = useTheme();
+  const { available, dismissed, latest, currentVersion } = useUpdate();
   const [missionsCompleted, setMissionsCompleted] = useState(0);
   const [activeDays, setActiveDays] = useState(0);
   const [unlockedCount, setUnlockedCount] = useState(0);
@@ -95,6 +98,39 @@ export default function ProfilePage() {
 
       {/* Appearance */}
       <AppearanceCard compact />
+
+      {/* App update status */}
+      <Card className="mb-6">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+              available && !dismissed
+                ? 'bg-warning-100 dark:bg-warning-900/30 text-warning-600'
+                : 'bg-success-100 dark:bg-success-900/30 text-success-600'
+            }`}>
+              <Download size={17} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200">
+                {available && !dismissed
+                  ? `نسخة جديدة متاحة: ${latest?.version}`
+                  : `Sada — النسخة ${currentVersion}`}
+              </p>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                {available && !dismissed
+                  ? 'افتح قسم التحديثات عشان تنزّلها وتثبّتها'
+                  : 'أنت على أحدث نسخة'}
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/updates"
+            className="text-xs font-bold text-primary-600 dark:text-primary-400 hover:underline"
+          >
+            عرض التحديثات
+          </Link>
+        </div>
+      </Card>
 
       {/* Quick links */}
       <Card className="mb-6">

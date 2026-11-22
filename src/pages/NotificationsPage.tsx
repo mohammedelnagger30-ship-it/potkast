@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Layout } from '@/components/layout';
 import { Card } from '@/components/ui';
-import { Bell, CheckCircle, Target, Award, Mic, Check, Trash2, Lightbulb, AlertCircle } from 'lucide-react';
+import { Bell, CheckCircle, Target, Award, Mic, Check, Trash2, Lightbulb, AlertCircle, Download } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 
@@ -23,6 +23,7 @@ const iconMap: Record<string, typeof Bell> = {
   reminder: Bell,
   tip: Lightbulb,
   streak_lost: AlertCircle,
+  app_update: Download,
 };
 
 function formatRelativeTime(dateString: string): string {

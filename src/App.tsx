@@ -18,6 +18,7 @@ import LearningPathsPage from '@/pages/LearningPathsPage';
 import LeaderboardPage from '@/pages/LeaderboardPage';
 import AchievementsPage from '@/pages/AchievementsPage';
 import DownloadsPage from '@/pages/DownloadsPage';
+import UpdatesPage from '@/pages/UpdatesPage';
 import PlayerPage from '@/pages/PlayerPage';
 import AuthPage from '@/pages/AuthPage';
 import OnboardingPage from '@/pages/OnboardingPage';
@@ -172,6 +173,16 @@ function App() {
           <ProtectedRoute>
             <OnboardingGuard>
               <SettingsPage />
+            </OnboardingGuard>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/updates"
+        element={
+          <ProtectedRoute>
+            <OnboardingGuard>
+              <UpdatesPage />
             </OnboardingGuard>
           </ProtectedRoute>
         }

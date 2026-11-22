@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Award, Bell, BookHeart, Check, CircleDot, Download, Heart, LogOut,
-  Route, Settings2, ShieldCheck, Trophy, UserRound,
+  RefreshCw, Route, Settings2, ShieldCheck, Trophy, UserRound,
 } from 'lucide-react';
 import { Layout } from '@/components/layout';
 import { Badge, Button, Card, CardHeader } from '@/components/ui';
@@ -10,6 +10,7 @@ import { ProfileIdentityCard } from '@/components/profile/ProfileIdentityCard';
 import { ProfileProgressCard } from '@/components/profile/ProfileProgressCard';
 import { UserPathsCard } from '@/components/profile/UserPathsCard';
 import { AppearanceCard } from '@/components/settings/AppearanceCard';
+import { UpdateCard } from '@/components/updates/UpdateCard';
 import { useAuth } from '@/context/AuthContext';
 import { interestLabels, interestOptions } from '@/lib/interests';
 
@@ -21,6 +22,7 @@ const shortcuts = [
   { icon: Route, label: 'مسارات التعلّم', to: '/learning-paths' },
   { icon: Trophy, label: 'لوحة المتصدّرين', to: '/leaderboard' },
   { icon: Bell, label: 'إعدادات الإشعارات', to: '/notifications/settings' },
+  { icon: RefreshCw, label: 'تحديثات التطبيق', to: '/updates' },
   { icon: UserRound, label: 'ملفي الشخصي', to: '/profile' },
 ];
 
@@ -82,6 +84,9 @@ export default function SettingsPage() {
 
       {/* Appearance */}
       <AppearanceCard />
+
+      {/* App updates */}
+      <UpdateCard />
 
       {/* Preferences */}
       <Card className="mb-6">
@@ -193,7 +198,7 @@ export default function SettingsPage() {
         <Button variant="ghost" onClick={() => void signOut()} leftIcon={<LogOut size={17} />} className="!text-error-600 hover:!bg-error-50 dark:hover:!bg-error-900/20">
           تسجيل الخروج
         </Button>
-        <Badge variant="neutral" className="mr-2">نمّي</Badge>
+        <Badge variant="neutral" className="mr-2">Sada</Badge>
       </Card>
     </Layout>
   );

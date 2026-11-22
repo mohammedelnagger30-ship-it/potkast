@@ -7,6 +7,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { AudioPlayerProvider } from '@/context/AudioPlayerContext';
 import { DownloadProvider } from '@/context/DownloadContext';
 import { ProgressProvider } from '@/context/ProgressContext';
+import { UpdateProvider } from '@/context/UpdateContext';
 import './index.css';
 
 if ('serviceWorker' in navigator) {
@@ -19,15 +20,17 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
       <AuthProvider>
-        <DownloadProvider>
-          <ProgressProvider>
-            <AudioPlayerProvider>
-              <BrowserRouter>
-                <App />
-              </BrowserRouter>
-            </AudioPlayerProvider>
-          </ProgressProvider>
-        </DownloadProvider>
+        <UpdateProvider>
+          <DownloadProvider>
+            <ProgressProvider>
+              <AudioPlayerProvider>
+                <BrowserRouter>
+                  <App />
+                </BrowserRouter>
+              </AudioPlayerProvider>
+            </ProgressProvider>
+          </DownloadProvider>
+        </UpdateProvider>
       </AuthProvider>
     </ThemeProvider>
   </StrictMode>
