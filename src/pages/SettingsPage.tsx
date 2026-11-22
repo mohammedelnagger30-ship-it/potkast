@@ -10,6 +10,7 @@ import { ProfileIdentityCard } from '@/components/profile/ProfileIdentityCard';
 import { ProfileProgressCard } from '@/components/profile/ProfileProgressCard';
 import { UserPathsCard } from '@/components/profile/UserPathsCard';
 import { AppearanceCard } from '@/components/settings/AppearanceCard';
+import { TextScaleCard } from '@/components/settings/TextScaleCard';
 import { UpdateCard } from '@/components/updates/UpdateCard';
 import { useAuth } from '@/context/AuthContext';
 import { interestLabels, interestOptions } from '@/lib/interests';
@@ -84,6 +85,9 @@ export default function SettingsPage() {
 
       {/* Appearance */}
       <AppearanceCard />
+
+      {/* Text size / Xiaomi simple mode */}
+      <TextScaleCard />
 
       {/* App updates */}
       <UpdateCard />

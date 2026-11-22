@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { TextScaleProvider } from '@/context/TextScaleContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { AudioPlayerProvider } from '@/context/AudioPlayerContext';
 import { DownloadProvider } from '@/context/DownloadContext';
@@ -19,19 +20,21 @@ if ('serviceWorker' in navigator) {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
-      <AuthProvider>
-        <UpdateProvider>
-          <DownloadProvider>
-            <ProgressProvider>
-              <AudioPlayerProvider>
-                <BrowserRouter>
-                  <App />
-                </BrowserRouter>
-              </AudioPlayerProvider>
-            </ProgressProvider>
-          </DownloadProvider>
-        </UpdateProvider>
-      </AuthProvider>
+      <TextScaleProvider>
+        <AuthProvider>
+          <UpdateProvider>
+            <DownloadProvider>
+              <ProgressProvider>
+                <AudioPlayerProvider>
+                  <BrowserRouter>
+                    <App />
+                  </BrowserRouter>
+                </AudioPlayerProvider>
+              </ProgressProvider>
+            </DownloadProvider>
+          </UpdateProvider>
+        </AuthProvider>
+      </TextScaleProvider>
     </ThemeProvider>
   </StrictMode>
 );

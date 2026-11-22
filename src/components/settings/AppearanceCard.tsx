@@ -198,7 +198,7 @@ export function AppearanceCard({ compact = false }: { compact?: boolean }) {
           <div className="h-9 bg-primary-600 text-primary-contrast flex items-center px-3 gap-1.5">
             <span className="w-2 h-2 rounded-full bg-current opacity-60" />
             <span className="w-2 h-2 rounded-full bg-current opacity-40" />
-            <span className="mr-auto text-[10px] font-extrabold">نمّي</span>
+            <span className="mr-auto text-[10px] font-extrabold">Sada</span>
           </div>
           <div className="p-3">
             <div className="flex items-center gap-2 mb-3">

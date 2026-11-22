@@ -79,6 +79,18 @@
     scroll-behavior: smooth;
   }
 
+  /* Xiaomi Simple mode / system font scaling is ignored when the user opts in. */
+  html.fixed-text-scale {
+    font-size: 16px !important;
+  }
+
+  html.fixed-text-scale,
+  html.fixed-text-scale body,
+  html.fixed-text-scale * {
+    -webkit-text-size-adjust: 100% !important;
+    text-size-adjust: 100% !important;
+  }
+
   body {
     @apply font-sans antialiased;
     @apply bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100;
