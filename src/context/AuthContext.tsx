@@ -85,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(readProfileCache);
   const [loading, setLoading] = useState(true);
   const manualSignOutRef = useRef(false);
+  const profileFetchRef = useRef<{ id: string; at: number } | null>(null);
 
   const restoreSession = async (backup: Session) => {
     const { error } = await supabase.auth.setSession(backup);
@@ -102,7 +103,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return active;
   };
 
-  const fetchProfile = async (userId: string) => {
+  // Supabase fires INITIAL_SESSION right after getSession(). Both paths used
+  // to fetch the same profile; a short guard removes the duplicate request.
+  const fetchProfile = async (userId: string, force = false) => {
+    const now = Date.now();
+    if (!force && profileFetchRef.current?.id === userId && now - profileFetchRef.current.at < 4000) {
+      return profile;
+    }
+    profileFetchRef.current = { id: userId, at: now };
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -259,7 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = async () => {
     if (session?.user) {
-      await fetchProfile(session.user.id);
+      await fetchProfile(session.user.id, true);
     }
   };
 

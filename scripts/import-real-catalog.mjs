@@ -886,6 +886,95 @@ const HOSTS = [
     typeOverride: "health",
     feeds: ["https://media.podeo.co/rss/NDM2NQ"],
   },
+
+  /* --- Requested podcasts + specific real episodes by topic (append only) --- */
+  {
+    artist: "بودكاست وسام",
+    name_ar: "بودكاست وسام",
+    slug: "podcast-wesam",
+    title_ar: "",
+    specialty_ar: "حوارات وتطوير ذات",
+    country: "",
+    type: "cultural",
+    typeOverride: "cultural",
+    feedsOnly: true,
+    feeds: ["https://feeds.soundcloud.com/users/soundcloud:users:1067236822/sounds.rss"],
+  },
+  {
+    artist: "ثيرابيا | Therapia",
+    name_ar: "ثيرابيا",
+    slug: "therapia",
+    title_ar: "",
+    specialty_ar: "سلوك وصحة نفسية",
+    country: "",
+    type: "psychology",
+    typeOverride: "psychology",
+    feedsOnly: true,
+    episodeMatch: "لغة الجسد|جسدك",
+    feeds: ["https://anchor.fm/s/1035ffb50/podcast/rss"],
+  },
+  {
+    artist: "عبدالرزاق الحاج سعيد",
+    name_ar: "إدمان إيجابي",
+    slug: "positive-addiction",
+    title_ar: "",
+    specialty_ar: "تنمية ذات وعقل باطن",
+    country: "",
+    type: "psychology",
+    typeOverride: "psychology",
+    feedsOnly: true,
+    episodeMatch: "العقل الباطن",
+    feeds: ["https://media.rss.com/positiveaddiction/feed.xml"],
+  },
+  {
+    artist: "EMPWR House | سارة سيف",
+    name_ar: "سارة سيف | فن الإبداع والتواصل",
+    slug: "empwr-communication",
+    title_ar: "",
+    specialty_ar: "تواصل وإبداع",
+    country: "",
+    type: "professional",
+    typeOverride: "professional",
+    feedsOnly: true,
+    episodeMatch: "التواصل|القاء|الإلقاء|سوشيال ميديا|علامتك التجارية",
+    feeds: ["https://media.podeo.co/rss/NDQxOQ"],
+  },
+  {
+    artist: "Ruqaya Albalooshi",
+    name_ar: "رُقى البلوشي | فن العلاقات",
+    slug: "fan-al-alaqat",
+    title_ar: "",
+    specialty_ar: "علاقات إنسانية",
+    country: "",
+    type: "relationships",
+    typeOverride: "relationships",
+    feedsOnly: true,
+    feeds: ["https://media.podeo.co/rss/ODI0Mw"],
+  },
+  {
+    artist: "FranklinCovey Middle East",
+    name_ar: "فرانكلين كوفي الشرق الأوسط | عن القيادة",
+    slug: "franklincovey-leadership",
+    title_ar: "",
+    specialty_ar: "قيادة وفرق عمل",
+    country: "",
+    type: "leadership",
+    typeOverride: "leadership",
+    feedsOnly: true,
+    feeds: ["https://feeds.redcircle.com/9d27f48a-fbd0-45d8-9015-8cdb30f00f96"],
+  },
+  {
+    artist: "Ertigal Podcast",
+    name_ar: "ارتجال بودكاست",
+    slug: "irtgal-podcast",
+    title_ar: "",
+    specialty_ar: "حوارات ارتجالية",
+    country: "",
+    type: "cultural",
+    typeOverride: "cultural",
+    feedsOnly: true,
+    feeds: ["https://feeds.soundcloud.com/users/soundcloud:users:399992814/sounds.rss"],
+  },
 ];
 
 const CATEGORY_BY_TYPE = {
@@ -1119,30 +1208,33 @@ async function findShows(host) {
 
   // Apple's search endpoint is aggressively rate-limited. Hosts whose Apple
   // artist id is known go straight to lookup (which returns the FULL catalog).
-  if (artistIds.size === 0) {
-    const aliases = [...new Set([host.artist, ...(host.aliases || [])].filter(Boolean))];
-    const wanted = new Set(aliases.map(normalizeName));
-    for (const term of aliases) {
-      for (const country of ['eg', 'sa', 'ae', 'us']) {
-        const results = await itunesSearch(term, country);
-        await sleep(350);
-        for (const r of results) {
-          if (!r.feedUrl) continue;
-          if (!wanted.has(normalizeName(r.artistName))) continue;
-          matched.push(r);
-          if (r.artistId) artistIds.add(String(r.artistId));
+  // feedsOnly hosts deliberately skip Apple so only the listed feeds are used.
+  if (!host.feedsOnly) {
+    if (artistIds.size === 0) {
+      const aliases = [...new Set([host.artist, ...(host.aliases || [])].filter(Boolean))];
+      const wanted = new Set(aliases.map(normalizeName));
+      for (const term of aliases) {
+        for (const country of ['eg', 'sa', 'ae', 'us']) {
+          const results = await itunesSearch(term, country);
+          await sleep(350);
+          for (const r of results) {
+            if (!r.feedUrl) continue;
+            if (!wanted.has(normalizeName(r.artistName))) continue;
+            matched.push(r);
+            if (r.artistId) artistIds.add(String(r.artistId));
+          }
         }
       }
     }
-  }
 
-  for (const artistId of artistIds) {
-    for (const country of ['eg', 'sa', 'ae']) {
-      const catalog = await itunesArtistCatalog(artistId, country);
-      await sleep(300);
-      for (const r of catalog) {
-        if (!r.feedUrl) continue;
-        matched.push(r);
+    for (const artistId of artistIds) {
+      for (const country of ['eg', 'sa', 'ae']) {
+        const catalog = await itunesArtistCatalog(artistId, country);
+        await sleep(300);
+        for (const r of catalog) {
+          if (!r.feedUrl) continue;
+          matched.push(r);
+        }
       }
     }
   }
@@ -1315,6 +1407,10 @@ async function buildCatalog(hostsToImport = HOSTS) {
           const res = await fetchWithRetry(show.feedUrl, { timeout: 45000 });
           if (!res.ok) return null;
           feed = parseFeed(await res.text(), show);
+        }
+        if (host.episodeMatch) {
+          const rx = new RegExp(host.episodeMatch, 'i');
+          feed.episodes = feed.episodes.filter((ep) => rx.test(`${ep.title} ${ep.description}`));
         }
         if (feed.episodes.length === 0) return null;
         return { show, feed };

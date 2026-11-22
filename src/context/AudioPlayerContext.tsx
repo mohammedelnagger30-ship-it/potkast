@@ -1,9 +1,9 @@
-import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { updateStatsOnListen } from '@/lib/statsHelper';
 import { localUrlFor, OFFLINE_AUDIO_PREFIX } from '@/lib/downloads';
-import { notifyProgressChanged } from '@/lib/progress';
+import { notifyProgressChanged, PROGRESS_CHANGED_EVENT } from '@/lib/progress';
 import type { Episode, Podcast } from '@/types/podcast';
 
 export type RepeatMode = 'none' | 'one' | 'all';
@@ -23,7 +23,8 @@ interface PlayerState {
 }
 
 interface AudioPlayerContextValue extends PlayerState {
-  playEpisode: (episode: Episode, podcast?: Podcast, queue?: Episode[]) => void;
+  playEpisode: (episode: Episode, podcast?: Podcast, queue?: Episode[], resumeSeconds?: number) => void;
+  setCurrentQueue: (episodes: Episode[]) => void;
   togglePlay: () => void;
   seek: (time: number) => void;
   skip: (seconds: number) => void;
@@ -40,40 +41,48 @@ const AudioPlayerContext = createContext<AudioPlayerContextValue | undefined>(un
 const SAVE_INTERVAL_MS = 5000;
 const PROGRESS_CACHE_KEY = 'nammy:progress-cache';
 
+// Parsing the whole progress snapshot used to happen on every single play tap.
+// Keep it in memory and invalidate it only when ProgressContext says it changed.
+let resumeCache: Map<string, number> | null = null;
+let resumeCacheListenerAdded = false;
+
+function getResumeCache(): Map<string, number> {
+  if (!resumeCache) {
+    resumeCache = new Map();
+    try {
+      const raw = localStorage.getItem(PROGRESS_CACHE_KEY);
+      if (raw) {
+        const cache = JSON.parse(raw) as {
+          history?: Array<{ episode_id: string; progress_seconds: number; completed: boolean }>;
+        };
+        for (const row of cache.history || []) {
+          if (!row.completed && row.progress_seconds > 5) {
+            resumeCache.set(row.episode_id, Math.floor(row.progress_seconds));
+          }
+        }
+      }
+    } catch {
+      // An empty cache only means playback starts from the beginning.
+    }
+    if (!resumeCacheListenerAdded) {
+      resumeCacheListenerAdded = true;
+      window.addEventListener(PROGRESS_CHANGED_EVENT, () => { resumeCache = null; });
+    }
+  }
+  return resumeCache;
+}
+
 // Play the downloaded file when one exists, otherwise stream the real remote URL.
 // No experimental/placeholder audio is ever played.
 function resolveAudioUrl(url?: string | null, episodeId?: string): string {
   return (episodeId && localUrlFor(episodeId)) || url || '';
 }
 
-// Metadata may still be loading when the saved position arrives. Apply it as
-// soon as the element is seekable, and only if this is still the same source.
-function seekWhenReady(audio: HTMLAudioElement, time: number, isCurrent: () => boolean) {
-  const apply = () => {
-    if (!isCurrent()) return;
-    try {
-      audio.currentTime = time;
-    } catch {
-      // Not seekable yet — the loadedmetadata listener will retry.
-    }
-  };
-  if (audio.readyState >= 1) apply();
-  else audio.addEventListener('loadedmetadata', apply, { once: true });
-}
-
 // ProgressContext keeps a local copy of listening_history. Reading it here
 // means playback can start from the saved position in one request, instead of
 // starting from zero and seeking later (which forces a second range request).
 function cachedResumeFor(episodeId: string): number {
-  try {
-    const raw = localStorage.getItem(PROGRESS_CACHE_KEY);
-    if (!raw) return 0;
-    const cache = JSON.parse(raw) as { history?: Array<{ episode_id: string; progress_seconds: number; completed: boolean }> };
-    const row = cache.history?.find((item) => item.episode_id === episodeId);
-    return row && !row.completed && row.progress_seconds > 5 ? Math.floor(row.progress_seconds) : 0;
-  } catch {
-    return 0;
-  }
+  return getResumeCache().get(episodeId) || 0;
 }
 
 function withStartAt(url: string, seconds: number): string {
@@ -136,6 +145,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastSaveRef = useRef(0);
   const progressRef = useRef(0);
+  const lastTimeRenderRef = useRef(0);
   // Incremented whenever the source changes so a slow history lookup can't
   // seek a later episode or override a newer user action.
   const playTokenRef = useRef(0);
@@ -156,12 +166,18 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const audio = new Audio();
     audioRef.current = audio;
-    audio.preload = 'metadata';
+    // Start buffering as soon as a source is assigned so play() has data ready.
+    audio.preload = 'auto';
     audio.volume = 1;
 
     const onTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
       progressRef.current = audio.currentTime;
+      // The UI does not need 4 React renders per second. Throttling this keeps
+      // the whole page responsive while the audio keeps playing smoothly.
+      const now = Date.now();
+      if (now - lastTimeRenderRef.current < 500) return;
+      lastTimeRenderRef.current = now;
+      setCurrentTime(audio.currentTime);
     };
     const onDurationChange = () => setDuration(audio.duration || 0);
     const onPlay = () => setIsPlaying(true);
@@ -268,7 +284,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       if (audioRef.current) {
         const audio = audioRef.current;
         const token = ++playTokenRef.current;
-        const resumeAt = cachedResumeFor(nextEp.id);
+        const localNext = isLocalAudioUrl(resolveAudioUrl(nextEp.audio_url, nextEp.id));
+        const resumeAt = localNext ? cachedResumeFor(nextEp.id) : 0;
         const source = sourceFor(nextEp.id, nextEp.audio_url, resumeAt);
         audio.src = source.url;
         setIsBuffering(true);
@@ -283,7 +300,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       if (audioRef.current) {
         const audio = audioRef.current;
         const token = ++playTokenRef.current;
-        const resumeAt = cachedResumeFor(queue[0].id);
+        const localFirst = isLocalAudioUrl(resolveAudioUrl(queue[0].audio_url, queue[0].id));
+        const resumeAt = localFirst ? cachedResumeFor(queue[0].id) : 0;
         const source = sourceFor(queue[0].id, queue[0].audio_url, resumeAt);
         audio.src = source.url;
         setIsBuffering(true);
@@ -310,7 +328,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   }, [isPlaying, currentEpisode, saveProgress]);
 
   const playEpisode = useCallback(
-    (episode: Episode, podcast?: Podcast, newQueue?: Episode[]) => {
+    (episode: Episode, podcast?: Podcast, newQueue?: Episode[], resumeSeconds = 0) => {
       if (!audioRef.current) return;
       if (!episode.audio_url) return;
 
@@ -335,8 +353,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
       const audio = audioRef.current;
       const token = ++playTokenRef.current;
-      const resumeAt = cachedResumeFor(episode.id);
       const isCurrent = () => token === playTokenRef.current && audioRef.current === audio;
+      const local = isLocalAudioUrl(resolveAudioUrl(episode.audio_url, episode.id));
+      // Downloaded files seek instantly. Streamed audio starts at zero unless
+      // the caller explicitly asks to continue — an implicit remote seek adds
+      // a second range request and a visible stall right after the first frame.
+      const resumeAt = local ? cachedResumeFor(episode.id) : Math.max(0, resumeSeconds);
       const source = sourceFor(episode.id, episode.audio_url, resumeAt);
       audio.src = source.url;
       audio.playbackRate = playbackRate;
@@ -348,37 +370,23 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         if (isCurrent()) setIsPlaying(false);
       });
 
-      // For streamed audio the saved position is applied only after playback
-      // has started, so the user hears sound instead of waiting for a second range.
+      // Only an explicit "continue listening" action seeks a remote stream.
       if (!source.local && resumeAt > 5) {
         resumeAfterAudible(audio, resumeAt, isCurrent);
       }
-
-      // The local cache normally covers resume. Only ask Supabase when it
-      // didn't, and don't seek once the episode is already playing.
-      if (user && resumeAt === 0) {
-        void (async () => {
-          try {
-            const { data } = await supabase
-              .from('listening_history')
-              .select('progress_seconds, completed')
-              .eq('user_id', user.id)
-              .eq('episode_id', episode.id)
-              .maybeSingle();
-            if (!isCurrent()) return;
-            const savedAt = data && !data.completed ? data.progress_seconds : 0;
-            if (savedAt > 5 && audio.currentTime < 1) {
-              if (source.local) seekWhenReady(audio, savedAt, isCurrent);
-              else resumeAfterAudible(audio, savedAt, isCurrent);
-            }
-          } catch {
-            // Playback already started; losing the saved position is harmless.
-          }
-        })();
-      }
     },
-    [currentEpisode, playbackRate, user]
+    [currentEpisode, playbackRate]
   );
+
+  const setCurrentQueue = useCallback((episodes: Episode[]) => {
+    setQueue(episodes);
+    setQueueIndex((current) => {
+      const id = currentEpisode?.id;
+      if (!id) return current;
+      const found = episodes.findIndex((ep) => ep.id === id);
+      return found >= 0 ? found : current;
+    });
+  }, [currentEpisode?.id]);
 
   const togglePlay = useCallback(() => {
     if (!audioRef.current || !currentEpisode) return;
@@ -423,7 +431,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     if (audioRef.current) {
       const audio = audioRef.current;
       const token = ++playTokenRef.current;
-      const resumeAt = cachedResumeFor(nextEp.id);
+      const localNext = isLocalAudioUrl(resolveAudioUrl(nextEp.audio_url, nextEp.id));
+      const resumeAt = localNext ? cachedResumeFor(nextEp.id) : 0;
       const source = sourceFor(nextEp.id, nextEp.audio_url, resumeAt);
       audio.src = source.url;
       audio.playbackRate = playbackRate;
@@ -444,7 +453,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     if (audioRef.current) {
       const audio = audioRef.current;
       const token = ++playTokenRef.current;
-      const resumeAt = cachedResumeFor(prevEp.id);
+      const localPrev = isLocalAudioUrl(resolveAudioUrl(prevEp.audio_url, prevEp.id));
+      const resumeAt = localPrev ? cachedResumeFor(prevEp.id) : 0;
       const source = sourceFor(prevEp.id, prevEp.audio_url, resumeAt);
       audio.src = source.url;
       audio.playbackRate = playbackRate;
@@ -480,32 +490,56 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('pagehide', onHide);
   }, [currentEpisode, saveProgress]);
 
+  const value = useMemo<AudioPlayerContextValue>(() => ({
+    currentEpisode,
+    currentPodcast,
+    queue,
+    queueIndex,
+    isPlaying,
+    isBuffering,
+    currentTime,
+    duration,
+    volume,
+    playbackRate,
+    repeatMode,
+    playEpisode,
+    setCurrentQueue,
+    togglePlay,
+    seek,
+    skip,
+    setVolume,
+    setPlaybackRate,
+    cycleRepeatMode,
+    playNext,
+    playPrev,
+    stop,
+  }), [
+    currentEpisode,
+    currentPodcast,
+    queue,
+    queueIndex,
+    isPlaying,
+    isBuffering,
+    currentTime,
+    duration,
+    volume,
+    playbackRate,
+    repeatMode,
+    playEpisode,
+    setCurrentQueue,
+    togglePlay,
+    seek,
+    skip,
+    setVolume,
+    setPlaybackRate,
+    cycleRepeatMode,
+    playNext,
+    playPrev,
+    stop,
+  ]);
+
   return (
-    <AudioPlayerContext.Provider
-      value={{
-        currentEpisode,
-        currentPodcast,
-        queue,
-        queueIndex,
-        isPlaying,
-        isBuffering,
-        currentTime,
-        duration,
-        volume,
-        playbackRate,
-        repeatMode,
-        playEpisode,
-        togglePlay,
-        seek,
-        skip,
-        setVolume,
-        setPlaybackRate,
-        cycleRepeatMode,
-        playNext,
-        playPrev,
-        stop,
-      }}
-    >
+    <AudioPlayerContext.Provider value={value}>
       {children}
     </AudioPlayerContext.Provider>
   );

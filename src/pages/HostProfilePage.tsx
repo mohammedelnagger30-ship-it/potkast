@@ -113,7 +113,7 @@ export default function HostProfilePage() {
       // Every podcast of this host, each with its real episode count.
       const { data: podData } = await supabase
         .from('podcasts')
-        .select('*, category:categories(*), episodes(count)')
+        .select('id,title,cover_url,type,audience_level,host_name,created_at,category_id,host_id,category:categories(name_ar),episodes(count)')
         .eq('host_id', hostRow.id)
         .order('created_at', { ascending: false })
         .range(0, 999);
@@ -125,39 +125,47 @@ export default function HostProfilePage() {
       const ids = pods.map((p) => p.id);
       const total = pods.reduce((sum, p) => sum + (p.episodes_count || 0), 0);
 
-      // First page of the newest episodes (so "تشغيل الكل" works right away).
-      let latestItems: EpisodeWithPod[] = [];
-      if (ids.length > 0) {
-        const { data: epData } = await supabase
-          .from('episodes')
-          .select('*')
-          .in('podcast_id', ids)
-          .order('published_at', { ascending: false })
-          .range(0, PAGE_SIZE - 1);
-        latestItems = ((epData || []) as Episode[]).map((e) => ({ ...e, podcast: map.get(e.podcast_id) }));
-      }
-
       if (cancelled) return;
 
+      // Show the host profile as soon as its own data is ready. The episode
+      // feed and follow state are background work and must not block the page.
       setHost(hostRow);
       setPodcasts(pods);
       setTotalEpisodes(total);
       setSort('latest');
       setFlat({
-        latest: { items: latestItems, hasMore: latestItems.length === PAGE_SIZE, loading: false },
+        latest: { items: [], hasMore: true, loading: true },
         top: { items: [], hasMore: true, loading: false },
       });
       setLoading(false);
 
-      if (user) {
-        const { data: followData } = await supabase
-          .from('host_follows')
-          .select('host_id')
-          .eq('user_id', user.id)
-          .eq('host_id', hostRow.id)
-          .maybeSingle();
-        if (!cancelled) setIsFollowing(!!followData);
-      }
+      void (async () => {
+        let latestItems: EpisodeWithPod[] = [];
+        if (ids.length > 0) {
+          const { data: epData } = await supabase
+            .from('episodes')
+            .select('*')
+            .in('podcast_id', ids)
+            .order('published_at', { ascending: false })
+            .range(0, PAGE_SIZE - 1);
+          latestItems = ((epData || []) as Episode[]).map((e) => ({ ...e, podcast: map.get(e.podcast_id) }));
+        }
+        if (cancelled) return;
+        setFlat({
+          latest: { items: latestItems, hasMore: latestItems.length === PAGE_SIZE, loading: false },
+          top: { items: [], hasMore: true, loading: false },
+        });
+
+        if (user) {
+          const { data: followData } = await supabase
+            .from('host_follows')
+            .select('host_id')
+            .eq('user_id', user.id)
+            .eq('host_id', hostRow.id)
+            .maybeSingle();
+          if (!cancelled) setIsFollowing(!!followData);
+        }
+      })();
     };
 
     fetchData();

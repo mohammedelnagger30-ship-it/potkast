@@ -114,7 +114,10 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
       setTotalsByHost({});
       setGlobalTotal(0);
     }
-    void refresh();
+    // The deep history + catalog-totals query is background work: show the
+    // saved snapshot first, then refresh once the app has settled.
+    const timer = window.setTimeout(() => { void refresh(); }, 1500);
+    return () => window.clearTimeout(timer);
   }, [user, refresh]);
 
   // The audio player fires this after every saved listening position.

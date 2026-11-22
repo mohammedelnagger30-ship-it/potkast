@@ -41,7 +41,12 @@ export default function PodcastsPage() {
 
   const fetchPodcasts = useCallback(async () => {
     const [{ data: podcastsData }, { data: categoriesData }, { data: favData }] = await Promise.all([
-      supabase.from('podcasts').select('*, category:categories(*), host:hosts(*)').order('created_at', { ascending: false }),
+      // Only card/filter fields — pulling every long description for 766 shows
+      // made the list slower to open without being displayed anywhere.
+      supabase
+        .from('podcasts')
+        .select('id,title,cover_url,type,audience_level,host_name,created_at,category_id,host_id,category:categories(name_ar),host:hosts(id,name_ar,slug,is_verified)')
+        .order('created_at', { ascending: false }),
       supabase.from('categories').select('*').order('name_ar'),
       user ? supabase.from('favorites').select('podcast_id').eq('user_id', user.id) : Promise.resolve({ data: null }),
     ]);
@@ -73,8 +78,13 @@ export default function PodcastsPage() {
 
     if (historyData && historyData.length > 0) {
       const episodes = historyData
-        .map((h: ListeningHistory & { episode?: Episode & { podcast?: Podcast } }) => h.episode)
-        .filter(Boolean) as (Episode & { podcast?: Podcast })[];
+        .map((h: ListeningHistory & { episode?: Episode & { podcast?: Podcast } }) => {
+          if (!h.episode) return null;
+          // Carry the saved position so "continue listening" can seek after the
+          // stream starts. Other play buttons stay on the instant-start path.
+          return { ...h.episode, podcast: h.episode.podcast, resumeAt: h.progress_seconds };
+        })
+        .filter(Boolean) as (Episode & { podcast?: Podcast; resumeAt?: number })[];
       setContinueEpisodes(episodes);
     }
   }, [user]);
@@ -147,9 +157,9 @@ export default function PodcastsPage() {
 
   const hasActiveFilters = searchQuery || selectedCategory !== 'all' || filterType !== 'all' || filterLevel !== 'all';
 
-  const handlePlayEpisodeFromHistory = (ep: Episode & { podcast?: Podcast }) => {
+  const handlePlayEpisodeFromHistory = (ep: Episode & { podcast?: Podcast; resumeAt?: number }) => {
     if (ep.podcast) {
-      playEpisode(ep, ep.podcast, continueEpisodes as Episode[]);
+      playEpisode(ep, ep.podcast, continueEpisodes as Episode[], ep.resumeAt || 0);
     }
   };
 

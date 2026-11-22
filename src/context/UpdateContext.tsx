@@ -140,7 +140,10 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
   }, [lastCheckedAt]);
 
   useEffect(() => {
-    void checkForUpdates(false);
+    // GitHub is not on the critical path of opening the app. Wait until the
+    // first screen has painted so the release check cannot delay playback.
+    const timer = window.setTimeout(() => { void checkForUpdates(false); }, 2500);
+    return () => window.clearTimeout(timer);
   }, [checkForUpdates]);
 
   useEffect(() => {

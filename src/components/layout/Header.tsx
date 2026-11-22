@@ -11,12 +11,12 @@ export function Header({ title }: { title: string }) {
   return (
     <header className="sticky top-0 z-40 glass-effect border-b border-neutral-200 dark:border-neutral-800">
       <div className="flex items-center justify-between h-16 px-4 lg:px-8">
-        <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">{title}</h2>
+        <h2 className="min-w-0 truncate text-lg font-bold text-neutral-900 dark:text-neutral-100">{title}</h2>
 
         <div className="flex items-center gap-2">
           <Link
             to="/updates"
-            className="relative flex items-center justify-center w-10 h-10 rounded-xl text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800 transition-all duration-200"
+            className="relative hidden sm:flex items-center justify-center w-10 h-10 rounded-xl text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800 transition-all duration-200"
             aria-label={hasUpdate ? 'تحديث متاح للتطبيق' : 'تحديثات التطبيق'}
             title={hasUpdate ? 'نسخة جديدة متاحة' : 'تحديثات التطبيق'}
           >

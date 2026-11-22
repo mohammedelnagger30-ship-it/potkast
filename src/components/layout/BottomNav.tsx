@@ -11,7 +11,7 @@ export function BottomNav() {
             to={item.path}
             end={item.path === '/'}
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-lg transition-all duration-200 min-w-[56px] ${
+              `flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 px-1 py-1.5 rounded-lg transition-all duration-200 ${
                 isActive
                   ? 'text-primary-600 dark:text-primary-400'
                   : 'text-neutral-400 dark:text-neutral-500'

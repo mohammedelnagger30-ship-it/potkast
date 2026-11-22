@@ -36,6 +36,46 @@ import {
 
 const EPISODES_PER_PAGE = 40;
 
+// A small LRU of podcast pages makes revisits instant and keeps the last opened
+// shows readable offline. Only the first batch is stored, never the whole show.
+const DETAIL_CACHE_KEY = 'sada:podcast-detail-cache';
+const DETAIL_CACHE_LIMIT = 20;
+const DETAIL_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+interface CachedDetail {
+  podcast: Podcast;
+  episodes: Episode[];
+  at: number;
+}
+
+function readDetailCache(id: string): CachedDetail | null {
+  try {
+    const all = JSON.parse(localStorage.getItem(DETAIL_CACHE_KEY) || '{}') as Record<string, CachedDetail>;
+    const item = all[id];
+    if (item && Date.now() - item.at < DETAIL_MAX_AGE_MS) return item;
+  } catch {
+    // Ignore a corrupted cache.
+  }
+  return null;
+}
+
+function writeDetailCache(id: string, podcast: Podcast, episodes: Episode[]) {
+  try {
+    const all = JSON.parse(localStorage.getItem(DETAIL_CACHE_KEY) || '{}') as Record<string, CachedDetail>;
+    all[id] = { podcast, episodes: episodes.slice(0, 100), at: Date.now() };
+    const keys = Object.keys(all);
+    if (keys.length > DETAIL_CACHE_LIMIT) {
+      keys
+        .sort((a, b) => (all[a].at || 0) - (all[b].at || 0))
+        .slice(0, keys.length - DETAIL_CACHE_LIMIT)
+        .forEach((key) => { delete all[key]; });
+    }
+    localStorage.setItem(DETAIL_CACHE_KEY, JSON.stringify(all));
+  } catch {
+    // Storage is optional — the network result is already in memory.
+  }
+}
+
 /** RSS descriptions often arrive as HTML; show clean text, never raw tags. */
 function plainText(value: string | null | undefined): string {
   return String(value || '')
@@ -74,15 +114,38 @@ export default function PodcastDetailPage() {
   useEffect(() => {
     if (!id) return;
 
+    let cancelled = false;
     const fetchData = async () => {
-      setLoading(true);
+      const cached = readDetailCache(id);
+      if (cached) {
+        setPodcast(cached.podcast);
+        setEpisodes(cached.episodes);
+        setVisibleEpisodes(EPISODES_PER_PAGE);
+        setDescExpanded(false);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
 
-      const { data: podData } = await supabase
-        .from('podcasts')
-        .select('*, category:categories(*), host:hosts(*)')
-        .eq('id', id)
-        .maybeSingle();
+      // Podcast details and the first episode batch are independent. Fetch them
+      // together and show the page as soon as they arrive — the rest of a long
+      // show's episodes load in the background instead of blocking first paint.
+      const [podRes, firstRes] = await Promise.all([
+        supabase
+          .from('podcasts')
+          .select('*, category:categories(*), host:hosts(*)')
+          .eq('id', id)
+          .maybeSingle(),
+        supabase
+          .from('episodes')
+          .select('*')
+          .eq('podcast_id', id)
+          .order('published_at', { ascending: false })
+          .range(0, 99),
+      ]);
 
+      if (cancelled) return;
+      const podData = podRes.data;
       if (!podData) {
         setLoading(false);
         return;
@@ -90,56 +153,50 @@ export default function PodcastDetailPage() {
       setPodcast(podData as Podcast);
       setDescExpanded(false);
 
-      const { data: epData } = await supabase
-        .from('episodes')
-        .select('*')
-        .eq('podcast_id', id)
-        .order('published_at', { ascending: false })
-        .range(0, 999);
-
-      const firstBatch = (epData || []) as Episode[];
-      const allEpisodes = [...firstBatch];
-      for (let offset = 1000; firstBatch.length === 1000; offset += 1000) {
-        const { data } = await supabase
-          .from('episodes')
-          .select('*')
-          .eq('podcast_id', id)
-          .order('published_at', { ascending: false })
-          .range(offset, offset + 999);
-        const batch = (data || []) as Episode[];
-        allEpisodes.push(...batch);
-        if (batch.length < 1000) break;
-      }
-
-      setEpisodes(allEpisodes);
+      const firstBatch = (firstRes.data || []) as Episode[];
+      setEpisodes(firstBatch);
       setVisibleEpisodes(EPISODES_PER_PAGE);
-
-      if (user) {
-        const [favResult, histResult] = await Promise.all([
-          supabase.from('favorites').select('podcast_id').eq('user_id', user.id).eq('podcast_id', id).maybeSingle(),
-          supabase.from('listening_history').select('*').eq('user_id', user.id).in('episode_id', (epData || []).map((e) => e.id)),
-        ]);
-
-        setIsFavorited(!!favResult.data);
-
-        const hMap = new Map<string, ListeningHistory>();
-        (histResult.data || []).forEach((h: ListeningHistory) => {
-          hMap.set(h.episode_id, h);
-        });
-        setHistoryMap(hMap);
-
-        const [bmResult, notesResult] = await Promise.all([
-          supabase.from('episode_bookmarks').select('*').eq('user_id', user.id).in('episode_id', (epData || []).map((e) => e.id)),
-          supabase.from('episode_notes').select('*').eq('user_id', user.id).in('episode_id', (epData || []).map((e) => e.id)),
-        ]);
-        setBookmarks((bmResult.data as EpisodeBookmark[]) || []);
-        setNotes((notesResult.data as EpisodeNote[]) || []);
-      }
-
       setLoading(false);
+      writeDetailCache(id, podData as Podcast, firstBatch);
+
+      void (async () => {
+        const allEpisodes = [...firstBatch];
+        for (let offset = 100; firstBatch.length === 100; offset += 100) {
+          const { data } = await supabase
+            .from('episodes')
+            .select('*')
+            .eq('podcast_id', id)
+            .order('published_at', { ascending: false })
+            .range(offset, offset + 99);
+          const batch = (data || []) as Episode[];
+          allEpisodes.push(...batch);
+          if (batch.length < 100) break;
+          if (cancelled) return;
+        }
+        if (!cancelled) setEpisodes(allEpisodes);
+
+        if (user && allEpisodes.length > 0) {
+          const ids = allEpisodes.slice(0, 1000).map((e) => e.id);
+          const [favResult, histResult, bmResult, notesResult] = await Promise.all([
+            supabase.from('favorites').select('podcast_id').eq('user_id', user.id).eq('podcast_id', id).maybeSingle(),
+            supabase.from('listening_history').select('*').eq('user_id', user.id).in('episode_id', ids),
+            supabase.from('episode_bookmarks').select('*').eq('user_id', user.id).in('episode_id', ids),
+            supabase.from('episode_notes').select('*').eq('user_id', user.id).in('episode_id', ids),
+          ]);
+          if (cancelled) return;
+
+          setIsFavorited(!!favResult.data);
+          const hMap = new Map<string, ListeningHistory>();
+          (histResult.data || []).forEach((h: ListeningHistory) => hMap.set(h.episode_id, h));
+          setHistoryMap(hMap);
+          setBookmarks((bmResult.data as EpisodeBookmark[]) || []);
+          setNotes((notesResult.data as EpisodeNote[]) || []);
+        }
+      })();
     };
 
     fetchData();
+    return () => { cancelled = true; };
   }, [id, user]);
 
   const toggleFavorite = useCallback(async () => {

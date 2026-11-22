@@ -21,19 +21,31 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Open the audio hosts early so pressing play does not wait on DNS/TLS. -->
+    <!-- Open the real audio hosts early so pressing play does not pay DNS/TLS. -->
     <link rel="preconnect" href="https://media.podeo.co" crossorigin />
     <link rel="preconnect" href="https://media-r2.podeo.co" crossorigin />
+    <link rel="preconnect" href="https://injector.simplecastaudio.com" crossorigin />
+    <link rel="preconnect" href="https://arn.ps" crossorigin />
+    <link rel="preconnect" href="https://pscrb.fm" crossorigin />
+    <link rel="preconnect" href="https://anchor.fm" crossorigin />
+    <link rel="preconnect" href="https://dts.podtrac.com" crossorigin />
     <link rel="dns-prefetch" href="https://api.hosting.thmanyah.com" />
-    <link rel="dns-prefetch" href="https://anchor.fm" />
-    <link rel="dns-prefetch" href="https://feeds.soundcloud.com" />
-    <link rel="dns-prefetch" href="https://dts.podtrac.com" />
-    <link rel="dns-prefetch" href="https://injector.simplecastaudio.com" />
+    <link rel="dns-prefetch" href="https://sphinx.acast.com" />
     <link rel="dns-prefetch" href="https://app.mixfm-sa.com" />
+    <link rel="dns-prefetch" href="https://feeds.soundcloud.com" />
+    <link rel="dns-prefetch" href="https://traffic.omny.fm" />
+    <link rel="dns-prefetch" href="https://www.buzzsprout.com" />
+    <link rel="dns-prefetch" href="https://api.spreaker.com" />
+    <!-- Fonts load after the first paint; Cairo is not allowed to block startup. -->
     <link
       href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&family=Tajawal:wght@300;400;500;700;800&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet" />
+    </noscript>
     <title>Sada — منصة البودكاست</title>
     <meta property="og:image" content="https://bolt.new/static/og_default.png">
     <meta name="twitter:card" content="summary_large_image">

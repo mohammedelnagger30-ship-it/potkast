@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Play, Pause, Heart, BadgeCheck, Loader2 } from 'lucide-react';
 import type { Podcast, Episode } from '@/types/podcast';
 import { supabase } from '@/lib/supabase';
+import { quickEpisodeFor, rememberEpisodes } from '@/lib/quickPlay';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { Badge } from '@/components/ui';
 import { typeLabels, levelLabels } from '@/types/podcast';
@@ -31,6 +32,7 @@ function episodesFor(podcastId: string): Promise<Episode[]> {
         .then(({ data }) => {
           const list = (data || []) as Episode[];
           resolvedEpisodes.set(podcastId, list);
+          rememberEpisodes(podcastId, list);
           return list;
         })
     );
@@ -47,7 +49,7 @@ function firstPlayable(podcastId: string): Episode | undefined {
 
 export function PodcastCard({ podcast, onToggleFavorite, compact = false }: PodcastCardProps) {
   const navigate = useNavigate();
-  const { currentEpisode, isPlaying, togglePlay, currentPodcast, playEpisode } = useAudioPlayer();
+  const { currentEpisode, isPlaying, togglePlay, currentPodcast, playEpisode, setCurrentQueue } = useAudioPlayer();
   const [starting, setStarting] = useState(false);
 
   const isCurrentPodcast = currentPodcast?.id === podcast.id;
@@ -66,9 +68,14 @@ export function PodcastCard({ podcast, onToggleFavorite, compact = false }: Podc
     // click handler used to delay `audio.play()` by hundreds of milliseconds
     // (and could lose the browser's user activation on touch devices).
     const known = resolvedEpisodes.get(podcast.id);
-    const knownFirst = firstPlayable(podcast.id);
-    if (known && knownFirst) {
-      playEpisode(knownFirst, podcast, known);
+    const knownFirst = firstPlayable(podcast.id) || quickEpisodeFor(podcast.id);
+    if (knownFirst) {
+      // The index is local and synchronous, so play() runs in this gesture —
+      // no Supabase round trip can eat the browser's user activation.
+      playEpisode(knownFirst, podcast, known || [knownFirst]);
+      if (!known) {
+        void episodesFor(podcast.id).then((list) => setCurrentQueue(list));
+      }
       return;
     }
 
@@ -140,9 +147,9 @@ export function PodcastCard({ podcast, onToggleFavorite, compact = false }: Podc
             tabIndex={0}
             onClick={openHost}
             onKeyDown={(e) => { if (e.key === 'Enter') openHost(e); }}
-            className="text-xs text-neutral-500 dark:text-neutral-400 truncate hover:text-primary-600 dark:hover:text-primary-400 transition-colors inline-flex items-center gap-0.5 cursor-pointer"
+            className="flex w-full min-w-0 items-center gap-0.5 text-xs text-neutral-500 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
           >
-            {hostName}
+            <span className="truncate">{hostName}</span>
             {podcast.host?.is_verified && <BadgeCheck size={11} className="text-primary-600 flex-shrink-0" />}
           </span>
         ) : (
@@ -208,9 +215,9 @@ export function PodcastCard({ podcast, onToggleFavorite, compact = false }: Podc
           tabIndex={0}
           onClick={openHost}
           onKeyDown={(e) => { if (e.key === 'Enter') openHost(e); }}
-          className="text-sm text-neutral-500 dark:text-neutral-400 truncate hover:text-primary-600 dark:hover:text-primary-400 transition-colors inline-flex items-center gap-1 cursor-pointer"
+          className="flex w-full min-w-0 items-center gap-1 text-sm text-neutral-500 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
         >
-          {hostName}
+          <span className="truncate">{hostName}</span>
           {podcast.host?.is_verified && <BadgeCheck size={13} className="text-primary-600 flex-shrink-0" />}
         </span>
       ) : (

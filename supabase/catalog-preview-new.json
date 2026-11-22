@@ -1,209 +1,78 @@
 [
   {
-    "name_ar": "هديل مرعي ومها جعفر",
-    "slug": "hadeel-maha",
+    "name_ar": "بودكاست وسام",
+    "slug": "podcast-wesam",
     "shows": [
       {
-        "title": "Podcast W Nos | بودكاست و نص",
-        "type": "comedy",
-        "episodes": 85
+        "title": "بودكاست وسام",
+        "type": "cultural",
+        "episodes": 2
       }
     ]
   },
   {
-    "name_ar": "محمد قيس | المشهد",
-    "slug": "mohammed-qais",
+    "name_ar": "ثيرابيا",
+    "slug": "therapia",
     "shows": [
       {
-        "title": "ملعبنا | Malaabna",
-        "type": "cultural",
-        "episodes": 96
-      },
-      {
-        "title": "عندي سؤال | Aandi Soual",
-        "type": "cultural",
-        "episodes": 95
-      },
-      {
-        "title": "منّا وفينا | Menna w Fina",
-        "type": "cultural",
-        "episodes": 87
-      },
-      {
-        "title": "Rap Up I راب أب",
-        "type": "cultural",
-        "episodes": 73
-      },
-      {
-        "title": "مغرب ستارز | Maghreb Stars",
-        "type": "cultural",
-        "episodes": 50
-      },
-      {
-        "title": "بالتوفيق | Bel Toufic",
-        "type": "cultural",
-        "episodes": 41
-      },
-      {
-        "title": "Khair I خير",
-        "type": "cultural",
-        "episodes": 30
-      },
-      {
-        "title": "سكون | Sukoon",
-        "type": "cultural",
-        "episodes": 28
-      },
-      {
-        "title": "Ana Gheir I أنا غير",
-        "type": "cultural",
-        "episodes": 24
-      },
-      {
-        "title": "أول مليون - Awal Malyoun",
-        "type": "cultural",
-        "episodes": 16
-      },
-      {
-        "title": "Mental Talk | مينتال توك",
-        "type": "cultural",
-        "episodes": 13
-      },
-      {
-        "title": "The Viral Room",
-        "type": "cultural",
-        "episodes": 12
-      },
-      {
-        "title": "Dardchat I دردشات",
-        "type": "cultural",
-        "episodes": 9
+        "title": "ما وراء السلوك",
+        "type": "psychology",
+        "episodes": 2
       }
     ]
   },
   {
-    "name_ar": "باسل الزارو وكريم ريحان",
-    "slug": "el-podcasters",
+    "name_ar": "إدمان إيجابي",
+    "slug": "positive-addiction",
     "shows": [
       {
-        "title": "El-Podcasters",
-        "type": "comedy",
-        "episodes": 201
+        "title": "إدمان إيجابي | Positive Addiction",
+        "type": "psychology",
+        "episodes": 1
       }
     ]
   },
   {
-    "name_ar": "عبدالرحمن مجدي",
-    "slug": "abdulrahman-magdy",
+    "name_ar": "سارة سيف | فن الإبداع والتواصل",
+    "slug": "empwr-communication",
     "shows": [
       {
-        "title": "جول كاست - Goal Cast",
-        "type": "sports",
-        "episodes": 119
+        "title": "The Art of Communication & Creativity with Sarah Seif فن الإبداع و التواصل مع منظمة سارة سيف",
+        "type": "professional",
+        "episodes": 8
       }
     ]
   },
   {
-    "name_ar": "شوط",
-    "slug": "shoot",
+    "name_ar": "رُقى البلوشي | فن العلاقات",
+    "slug": "fan-al-alaqat",
     "shows": [
       {
-        "title": "شوط",
-        "type": "sports",
-        "episodes": 83
-      },
-      {
-        "title": "صالون الجمهور",
-        "type": "sports",
-        "episodes": 6
-      }
-    ]
-  },
-  {
-    "name_ar": "نوف عزيز",
-    "slug": "nouf-aziz",
-    "shows": [
-      {
-        "title": "شخصية عادية جداً",
-        "type": "cultural",
-        "episodes": 141
-      }
-    ]
-  },
-  {
-    "name_ar": "أبو طلال الحمراني",
-    "slug": "abu-talal-alhamrani",
-    "shows": [
-      {
-        "title": "سوالف طريق - ابو طلال الحمراني",
-        "type": "history",
-        "episodes": 1916
-      }
-    ]
-  },
-  {
-    "name_ar": "محمد عبدالعاطي",
-    "slug": "mohamed-abdelaty",
-    "shows": [
-      {
-        "title": "مع كامل احترامي - Ma3 Kamel A7terami",
-        "type": "comedy",
-        "episodes": 42
-      }
-    ]
-  },
-  {
-    "name_ar": "زياد علاء الدين",
-    "slug": "ziad-aladdin",
-    "shows": [
-      {
-        "title": "GLASSROOM جلاس روم",
-        "type": "cultural",
-        "episodes": 57
-      }
-    ]
-  },
-  {
-    "name_ar": "مها حسبو",
-    "slug": "maha-hasabo",
-    "shows": [
-      {
-        "title": "الحكاية أبسط من كده",
+        "title": "فن العلاقات",
         "type": "relationships",
-        "episodes": 11
+        "episodes": 10
       }
     ]
   },
   {
-    "name_ar": "ماهر المعيقلي",
-    "slug": "maher-al-muaiqly",
+    "name_ar": "فرانكلين كوفي الشرق الأوسط | عن القيادة",
+    "slug": "franklincovey-leadership",
     "shows": [
       {
-        "title": "The Holy Quran, Sheikh Maher Al-Muaiqly | القران الكريم ماهر المعيقلي",
-        "type": "religious",
-        "episodes": 114
+        "title": "بودكاست عن القيادة",
+        "type": "leadership",
+        "episodes": 10
       }
     ]
   },
   {
-    "name_ar": "سعود الشريم",
-    "slug": "saud-al-shuraim",
+    "name_ar": "ارتجال بودكاست",
+    "slug": "irtgal-podcast",
     "shows": [
       {
-        "title": "Saud Al-Shuraim - سعود الشريم",
-        "type": "religious",
-        "episodes": 64
-      }
-    ]
-  },
-  {
-    "name_ar": "طارق ثروت",
-    "slug": "tarek-tharwat",
-    "shows": [
-      {
-        "title": "Tarek Tharwat | The Smart Dentist طبيب الاسنان الذكي مع الدكتور طارق ثروت",
-        "type": "health",
-        "episodes": 11
+        "title": "ارتجال بودكاست",
+        "type": "cultural",
+        "episodes": 5
       }
     ]
   }
