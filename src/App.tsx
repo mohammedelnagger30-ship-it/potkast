@@ -1,28 +1,32 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import HomePage from '@/pages/HomePage';
-import PodcastsPage from '@/pages/PodcastsPage';
-import PodcastDetailPage from '@/pages/PodcastDetailPage';
-import HostsPage from '@/pages/HostsPage';
-import HostProfilePage from '@/pages/HostProfilePage';
-import MissionsPage from '@/pages/MissionsPage';
-import ProgressPage from '@/pages/ProgressPage';
-import NotificationsPage from '@/pages/NotificationsPage';
-import ProfilePage from '@/pages/ProfilePage';
-import SettingsPage from '@/pages/SettingsPage';
-import NotificationSettingsPage from '@/pages/NotificationSettingsPage';
-import JournalPage from '@/pages/JournalPage';
-import LifeWheelPage from '@/pages/LifeWheelPage';
-import LearningPathsPage from '@/pages/LearningPathsPage';
-import LeaderboardPage from '@/pages/LeaderboardPage';
-import AchievementsPage from '@/pages/AchievementsPage';
-import DownloadsPage from '@/pages/DownloadsPage';
-import UpdatesPage from '@/pages/UpdatesPage';
-import PlayerPage from '@/pages/PlayerPage';
 import AuthPage from '@/pages/AuthPage';
 import OnboardingPage from '@/pages/OnboardingPage';
 import type { ReactNode } from 'react';
+
+// Everything that is not needed for the first paint is loaded on demand.
+// This keeps the startup bundle small and the app responsive on low-end phones.
+const PodcastsPage = lazy(() => import('@/pages/PodcastsPage'));
+const PodcastDetailPage = lazy(() => import('@/pages/PodcastDetailPage'));
+const HostsPage = lazy(() => import('@/pages/HostsPage'));
+const HostProfilePage = lazy(() => import('@/pages/HostProfilePage'));
+const MissionsPage = lazy(() => import('@/pages/MissionsPage'));
+const ProgressPage = lazy(() => import('@/pages/ProgressPage'));
+const NotificationsPage = lazy(() => import('@/pages/NotificationsPage'));
+const ProfilePage = lazy(() => import('@/pages/ProfilePage'));
+const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
+const NotificationSettingsPage = lazy(() => import('@/pages/NotificationSettingsPage'));
+const JournalPage = lazy(() => import('@/pages/JournalPage'));
+const LifeWheelPage = lazy(() => import('@/pages/LifeWheelPage'));
+const LearningPathsPage = lazy(() => import('@/pages/LearningPathsPage'));
+const LeaderboardPage = lazy(() => import('@/pages/LeaderboardPage'));
+const AchievementsPage = lazy(() => import('@/pages/AchievementsPage'));
+const DownloadsPage = lazy(() => import('@/pages/DownloadsPage'));
+const UpdatesPage = lazy(() => import('@/pages/UpdatesPage'));
+const PlayerPage = lazy(() => import('@/pages/PlayerPage'));
 
 function OnboardingGuard({ children }: { children: ReactNode }) {
   const { profile, loading } = useAuth();
@@ -42,8 +46,17 @@ function OnboardingGuard({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function RouteFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]" role="status" aria-label="جارٍ فتح الصفحة">
+      <div className="w-8 h-8 rounded-full border-4 border-primary-600 border-t-transparent animate-spin" />
+    </div>
+  );
+}
+
 function App() {
   return (
+    <Suspense fallback={<RouteFallback />}>
     <Routes>
       {/* Public routes */}
       <Route path="/auth" element={<AuthPage />} />
@@ -251,6 +264,7 @@ function App() {
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
   );
 }
 

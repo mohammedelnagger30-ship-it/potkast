@@ -164,7 +164,7 @@ export default function PodcastsPage() {
               <Headphones size={30} />
             </div>
             <div>
-              <h2 className="text-xl font-extrabold text-white">بودكاست نمّي</h2>
+              <h2 className="text-xl font-extrabold text-white">بودكاست Sada</h2>
               <p className="text-primary-100 text-sm mt-1">{allPodcasts.length} بودكاست في تطوير الذات</p>
             </div>
           </div>

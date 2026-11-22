@@ -18,43 +18,49 @@ export interface NotificationSettings {
   push_enabled: boolean;
 }
 
+const DAILY_TIP_CACHE_KEY = 'sada:daily-tip';
+
 export async function getDailyTip(user: User, interests: string[]): Promise<Tip | null> {
-  // Use a deterministic seed based on the date so the tip is consistent for the day
+  // Use a deterministic seed based on the date so the tip is consistent for the day.
   const today = new Date().toISOString().split('T')[0];
   const dayHash = today.split('-').reduce((acc, part) => acc + parseInt(part, 10), 0);
+  const cacheKey = `${DAILY_TIP_CACHE_KEY}:${today}:${[...interests].sort().join(',')}`;
 
-  // Try to find tips matching user interests categories
-  // First, get category IDs matching user interests
-  const interestCategoryNames = interests.map((i) => interestToCategoryName(i)).filter(Boolean);
-
-  let query = supabase.from('tips').select('*');
-
-  if (interestCategoryNames.length > 0) {
-    const { data: matchingCats } = await supabase
-      .from('categories')
-      .select('id')
-      .in('name_ar', interestCategoryNames);
-
-    if (matchingCats && matchingCats.length > 0) {
-      const catIds = matchingCats.map((c) => c.id);
-      const { data: interestTips } = await supabase
-        .from('tips')
-        .select('*')
-        .in('category_id', catIds);
-
-      if (interestTips && interestTips.length > 0) {
-        const idx = dayHash % interestTips.length;
-        return interestTips[idx] as Tip;
-      }
-    }
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) return JSON.parse(cached) as Tip;
+  } catch {
+    // Cache is optional — fall through to the network.
   }
 
-  // Fallback: get any tip
-  const { data: allTips, error } = await supabase.from('tips').select('*');
-  if (error || !allTips || allTips.length === 0) return null;
+  const interestCategoryNames = interests.map((i) => interestToCategoryName(i)).filter(Boolean);
 
-  const idx = dayHash % allTips.length;
-  return allTips[idx] as Tip;
+  // Categories and tips are independent. Fetch them together instead of making
+  // three sequential round trips on every cold start.
+  const [categoriesRes, tipsRes] = await Promise.all([
+    supabase
+      .from('categories')
+      .select('id')
+      .in('name_ar', interestCategoryNames.length > 0 ? interestCategoryNames : ['__none__']),
+    supabase.from('tips').select('id, text_ar, author_or_source, category_id, type'),
+  ]);
+
+  const allTips = (tipsRes.data || []) as Tip[];
+  if (allTips.length === 0) return null;
+
+  const catIds = (categoriesRes.data || []).map((c) => c.id);
+  const interestTips = catIds.length > 0
+    ? allTips.filter((tip) => tip.category_id && catIds.includes(tip.category_id))
+    : [];
+  const pool = interestTips.length > 0 ? interestTips : allTips;
+  const tip = pool[dayHash % pool.length];
+
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify(tip));
+  } catch {
+    // Storage may be disabled — the tip still works for this session.
+  }
+  return tip;
 }
 
 function interestToCategoryName(interest: string): string | null {

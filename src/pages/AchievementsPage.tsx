@@ -125,7 +125,7 @@ export default function AchievementsPage() {
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     ctx.font = 'bold 16px sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText('نمّي — رحلة تطوير الذات', w - 30, 35);
+    ctx.fillText('Sada — رحلة تطوير الذات', w - 30, 35);
 
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 28px sans-serif';
@@ -158,7 +158,7 @@ export default function AchievementsPage() {
 
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.font = '12px sans-serif';
-    ctx.fillText(profile?.name || 'مستخدم نمّي', w / 2, 370);
+    ctx.fillText(profile?.name || 'مستخدم Sada', w / 2, 370);
   };
 
   const shareAchievement = (ach: Achievement) => {
@@ -186,7 +186,7 @@ export default function AchievementsPage() {
       const file = new File([blob], 'achievement.png', { type: 'image/png' });
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({
-          title: 'وسامي في نمّي',
+          title: 'وسامي في Sada',
           text: `فازحت بوسام: ${sharingAch?.label}`,
           files: [file],
         });

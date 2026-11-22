@@ -32,6 +32,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const SESSION_BACKUP_KEY = 'nammy:auth-session';
 const MANUAL_SIGNOUT_KEY = 'nammy:manual-signout';
+const PROFILE_CACHE_KEY = 'sada:profile-cache';
 const MANUAL_SIGNOUT_WINDOW_MS = 15000;
 
 function saveSessionBackup(session: Session | null) {
@@ -52,6 +53,24 @@ function readSessionBackup(): Session | null {
   }
 }
 
+function readProfileCache(): Profile | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as Profile) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveProfileCache(profile: Profile | null) {
+  try {
+    if (profile) localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
+    else localStorage.removeItem(PROFILE_CACHE_KEY);
+  } catch {
+    // Storage may be blocked — the in-memory profile still works.
+  }
+}
+
 function wasManualSignOut() {
   try {
     const at = Number(localStorage.getItem(MANUAL_SIGNOUT_KEY) || 0);
@@ -63,7 +82,7 @@ function wasManualSignOut() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(readProfileCache);
   const [loading, setLoading] = useState(true);
   const manualSignOutRef = useRef(false);
 
@@ -94,19 +113,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Error fetching profile:', error);
       return null;
     }
-    setProfile(data as Profile | null);
-    return data as Profile | null;
+    const next = data as Profile | null;
+    setProfile(next);
+    if (next) saveProfileCache(next);
+    return next;
   };
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
-      if (data.session) {
-        saveSessionBackup(data.session);
-        setSession(data.session);
-        await fetchProfile(data.session.user.id);
-        setLoading(false);
+      const activeSession = data.session;
+      if (activeSession) {
+        const cached = readProfileCache();
+        const hasUsableCache = cached?.id === activeSession.user.id;
+        saveSessionBackup(activeSession);
+        setSession(activeSession);
+
+        // A cached profile lets the first screen paint immediately. The fresh
+        // profile still syncs in the background so nothing stays stale.
+        if (hasUsableCache) {
+          setLoading(false);
+          void fetchProfile(activeSession.user.id);
+        } else {
+          await fetchProfile(activeSession.user.id);
+          setLoading(false);
+        }
         return;
       }
+
       const backup = readSessionBackup();
       if (backup && !wasManualSignOut()) {
         setLoading(true);
@@ -115,6 +148,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           saveSessionBackup(null);
         }
+      } else {
+        saveProfileCache(null);
       }
       setLoading(false);
     });
@@ -128,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!backup) {
           setSession(null);
           setProfile(null);
+          saveProfileCache(null);
           setLoading(false);
           return;
         }
@@ -215,6 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     await supabase.auth.signOut();
     saveSessionBackup(null);
+    saveProfileCache(null);
     setProfile(null);
     setSession(null);
     window.setTimeout(() => { manualSignOutRef.current = false; }, 1000);

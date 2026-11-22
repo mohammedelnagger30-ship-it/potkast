@@ -35,25 +35,35 @@ export default function HomePage() {
   const loadHomeData = useCallback(async () => {
     if (!user) return;
 
-    // Fetch completed missions count
-    const { data: completedMissions } = await supabase
-      .from('user_missions')
-      .select('id, completed_at, assigned_date, status, mission:missions(*)')
-      .eq('user_id', user.id)
-      .eq('status', 'completed');
+    const today = new Date().toISOString().split('T')[0];
 
-    const completedCount = completedMissions?.length || 0;
+    // These calls do not depend on each other. Running them together removes
+    // the old 4-request waterfall that made the home page feel slow to open.
+    const [completedRes, listenedRes, todayRes, tip] = await Promise.all([
+      supabase
+        .from('user_missions')
+        .select('id, completed_at, assigned_date, status, mission:missions(*)')
+        .eq('user_id', user.id)
+        .eq('status', 'completed'),
+      supabase
+        .from('listening_history')
+        .select('episode_id')
+        .eq('user_id', user.id),
+      supabase
+        .from('user_missions')
+        .select('*, mission:missions(*)')
+        .eq('user_id', user.id)
+        .eq('assigned_date', today)
+        .order('created_at', { ascending: true }),
+      getDailyTip(user, profile?.interests || []),
+    ]);
 
-    // Fetch listened episodes count
-    const { data: listened } = await supabase
-      .from('listening_history')
-      .select('episode_id')
-      .eq('user_id', user.id);
-
-    const listenedCount = listened?.length || 0;
+    const completedMissions = completedRes.data || [];
+    const listened = listenedRes.data || [];
+    const todayData = todayRes.data || [];
 
     // Calculate streak
-    const allCompleted = (completedMissions || [])
+    const allCompleted = completedMissions
       .filter((um) => um.completed_at)
       .map((um) => new Date(um.completed_at!).toISOString().split('T')[0]);
     const uniqueDates = [...new Set(allCompleted)].sort().reverse();
@@ -76,27 +86,15 @@ export default function HomePage() {
       }
     }
 
-    // Fetch today's missions
-    const today = new Date().toISOString().split('T')[0];
-    const { data: todayData } = await supabase
-      .from('user_missions')
-      .select('*, mission:missions(*)')
-      .eq('user_id', user.id)
-      .eq('assigned_date', today)
-      .order('created_at', { ascending: true });
+    setTodayMissions(todayData as UserMission[]);
 
-    setTodayMissions((todayData as UserMission[]) || []);
-
-    const xp = profile?.xp || 0;
     setStats({
-      episodesListened: listenedCount,
-      missionsCompleted: completedCount,
-      xp,
+      episodesListened: listened.length,
+      missionsCompleted: completedMissions.length,
+      xp: profile?.xp || 0,
       streak: currentStreak,
     });
 
-    // Load daily tip
-    const tip = await getDailyTip(user, profile?.interests || []);
     setDailyTip(tip);
     setTipLoading(false);
   }, [user, profile]);

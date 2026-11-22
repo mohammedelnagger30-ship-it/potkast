@@ -61,7 +61,7 @@ export function ProfileIdentityCard({ compact = false }: { compact?: boolean }) 
     }
   }, [profile, editing]);
 
-  const displayName = profile?.name?.trim() || user?.email?.split('@')[0] || 'مستخدم نمّي';
+  const displayName = profile?.name?.trim() || user?.email?.split('@')[0] || 'مستخدم Sada';
   const initials = displayName.charAt(0);
   const xp = profile?.xp || 0;
   const level = levelFromXp(xp);

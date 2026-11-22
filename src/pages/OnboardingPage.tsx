@@ -128,7 +128,7 @@ export default function OnboardingPage() {
               <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary-600 text-white">
                 <Sparkles size={16} />
               </div>
-              <span className="font-extrabold text-neutral-900 dark:text-white">نمّي</span>
+              <span className="font-extrabold text-neutral-900 dark:text-white">Sada</span>
             </div>
             <span className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">
               الخطوة {step} من 4
@@ -157,10 +157,10 @@ export default function OnboardingPage() {
                 <Sparkles size={44} />
               </div>
               <h1 className="text-2xl lg:text-3xl font-extrabold text-neutral-900 dark:text-white mb-3">
-                أهلاً بك في نمّي، {displayName}
+                أهلاً بك في Sada، {displayName}
               </h1>
               <p className="text-neutral-600 dark:text-neutral-400 text-lg leading-relaxed max-w-lg mx-auto mb-8">
-                نمّي منصّة عربية لتطوير الذات، تجمع بين البودكاست الملهم، المهام العملية،
+                Sada منصّة عربية لتطوير الذات، تجمع بين البودكاست الملهم، المهام العملية،
                 وتتبّع تقدّمك الشخصي — كل ما تحتاجه في رحلة نموّك على طريق واحد.
               </p>
 

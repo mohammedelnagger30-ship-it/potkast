@@ -94,7 +94,7 @@ export default function AuthPage() {
           <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary-600 text-white">
             <Sparkles size={18} />
           </div>
-          <span className="text-lg font-extrabold text-neutral-900 dark:text-white">نمّي</span>
+          <span className="text-lg font-extrabold text-neutral-900 dark:text-white">Sada</span>
         </div>
         <button
           onClick={toggleTheme}
@@ -110,7 +110,7 @@ export default function AuthPage() {
         <div className="w-full max-w-md animate-fade-in-up">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-extrabold text-neutral-900 dark:text-white mb-2">
-              {mode === 'signup' ? 'ابدأ رحلتك مع نمّي' : 'مرحباً بعودتك'}
+              {mode === 'signup' ? 'ابدأ رحلتك مع Sada' : 'مرحباً بعودتك'}
             </h1>
             <p className="text-neutral-500 dark:text-neutral-400">
               {mode === 'signup'

@@ -25,7 +25,7 @@ export function Sidebar() {
           <Sparkles size={22} />
         </div>
         <div>
-          <h1 className="text-xl font-extrabold text-neutral-900 dark:text-white">نمّي</h1>
+          <h1 className="text-xl font-extrabold text-neutral-900 dark:text-white">Sada</h1>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">تطوير الذات</p>
         </div>
       </div>

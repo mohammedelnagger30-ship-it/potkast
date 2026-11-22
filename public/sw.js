@@ -120,12 +120,12 @@ self.addEventListener('fetch', (event) => {
 
 // Push notifications (unchanged behaviour).
 self.addEventListener('push', (event) => {
-  let data = { title: 'نمّي', body: 'إشعار جديد' };
+  let data = { title: 'Sada', body: 'إشعار جديد' };
   if (event.data) {
     try {
       data = event.data.json();
     } catch {
-      data = { title: 'نمّي', body: event.data.text() };
+      data = { title: 'Sada', body: event.data.text() };
     }
   }
 
