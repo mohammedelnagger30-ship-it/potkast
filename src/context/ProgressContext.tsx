@@ -8,6 +8,9 @@ import {
 } from '@/lib/progress';
 
 const CACHE_KEY = 'nammy:progress-cache';
+// The catalog totals are effectively static (the imported catalog rarely changes).
+// Reusing a fresh snapshot avoids a paged aggregate query on every cold start.
+const TOTALS_FRESH_MS = 24 * 60 * 60 * 1000;
 
 interface CachedProgress {
   userId: string;
@@ -44,6 +47,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
   const timerRef = useRef<number | null>(null);
   const totalsRef = useRef(totalsByHost);
   const globalRef = useRef(globalTotal);
+  const userIdRef = useRef<string | null>(null);
 
   const persistSnapshot = useCallback((rows: HistoryWithRelations[]) => {
     if (!user) return;
@@ -68,9 +72,14 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
+      const cached = readCache(user.id);
+      const totalsFresh = cached && Date.now() - cached.savedAt < TOTALS_FRESH_MS
+        && Object.keys(cached.totalsByHost || {}).length > 0;
       const [rows, totals] = await Promise.all([
         fetchListeningHistory(user.id),
-        fetchCatalogTotals(),
+        totalsFresh
+          ? Promise.resolve({ byHost: cached!.totalsByHost, global: cached!.globalTotal })
+          : fetchCatalogTotals(),
       ]);
       setHistory(rows);
       totalsRef.current = totals.byHost;
@@ -78,6 +87,23 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
       setTotalsByHost(totals.byHost);
       setGlobalTotal(totals.global);
       persistSnapshot(rows);
+
+      // A newly imported show must not wait for the cache to expire. Use the
+      // fresh snapshot immediately, then reconcile the totals quietly so the
+      // next cold start is already up to date.
+      if (totalsFresh) {
+        const userId = user.id;
+        void fetchCatalogTotals()
+          .then((latest) => {
+            if (userIdRef.current !== userId) return;
+            totalsRef.current = latest.byHost;
+            globalRef.current = latest.global;
+            setTotalsByHost(latest.byHost);
+            setGlobalTotal(latest.global);
+            persistSnapshot(rows);
+          })
+          .catch(() => undefined);
+      }
     } catch {
       // Keep the last good snapshot when offline (cached state stays mounted).
     }
@@ -99,6 +125,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
   // Show the saved snapshot immediately so progress is visible offline,
   // then quietly bring it up to date from Supabase.
   useEffect(() => {
+    userIdRef.current = user?.id ?? null;
     if (!user) return;
     const cached = readCache(user.id);
     if (cached) {

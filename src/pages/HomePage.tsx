@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Layout } from '@/components/layout';
 import { Card, CardHeader, Badge, ProgressBar } from '@/components/ui';
 import { Sparkles, Mic, Target, TrendingUp, ArrowLeft, Zap, CheckCircle2, Flame, Lightbulb, BookOpen, Quote, ScrollText, Brain, RefreshCw } from 'lucide-react';
@@ -20,22 +20,46 @@ const tipTypeMeta: Record<string, { icon: typeof Lightbulb; label: string; color
   fact: { icon: Brain, label: 'معلومة', color: 'text-orange-500 bg-orange-100 dark:bg-orange-900/30' },
 };
 
+const HOME_CACHE_KEY = 'sada:home-cache';
+const HOME_CACHE_MAX_AGE = 10 * 60 * 1000;
+
+interface HomeSnapshot {
+  userId: string;
+  date: string;
+  stats: { episodesListened: number; missionsCompleted: number; xp: number; streak: number };
+  missions: UserMission[];
+  tip: Tip | null;
+  savedAt: number;
+}
+
+function readHomeCache(userId: string, today: string): HomeSnapshot | null {
+  try {
+    const raw = localStorage.getItem(HOME_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as HomeSnapshot;
+    if (parsed.userId !== userId || parsed.date !== today) return null;
+    if (Date.now() - parsed.savedAt > HOME_CACHE_MAX_AGE) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+const emptyStats = { episodesListened: 0, missionsCompleted: 0, xp: 0, streak: 0 };
+
 export default function HomePage() {
   const { user, profile } = useAuth();
-  const [stats, setStats] = useState({
-    episodesListened: 0,
-    missionsCompleted: 0,
-    xp: 0,
-    streak: 0,
-  });
-  const [todayMissions, setTodayMissions] = useState<UserMission[]>([]);
-  const [dailyTip, setDailyTip] = useState<Tip | null>(null);
-  const [tipLoading, setTipLoading] = useState(true);
+  const today = new Date().toISOString().split('T')[0];
+  const cached = useMemo(() => (user ? readHomeCache(user.id, today) : null), [user, today]);
+
+  const [stats, setStats] = useState(cached?.stats || emptyStats);
+  const [todayMissions, setTodayMissions] = useState<UserMission[]>(cached?.missions || []);
+  const [dailyTip, setDailyTip] = useState<Tip | null>(cached?.tip || null);
+  const [tipLoading, setTipLoading] = useState(!cached);
 
   const loadHomeData = useCallback(async () => {
     if (!user) return;
 
-    const today = new Date().toISOString().split('T')[0];
 
     // These calls do not depend on each other. Running them together removes
     // the old 4-request waterfall that made the home page feel slow to open.
@@ -86,18 +110,33 @@ export default function HomePage() {
       }
     }
 
-    setTodayMissions(todayData as UserMission[]);
-
-    setStats({
+    const nextStats = {
       episodesListened: listened.length,
       missionsCompleted: completedMissions.length,
       xp: profile?.xp || 0,
       streak: currentStreak,
-    });
+    };
+    const missions = todayData as UserMission[];
 
+    setTodayMissions(missions);
+    setStats(nextStats);
     setDailyTip(tip);
     setTipLoading(false);
-  }, [user, profile]);
+
+    try {
+      const snapshot: HomeSnapshot = {
+        userId: user.id,
+        date: today,
+        stats: nextStats,
+        missions,
+        tip,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem(HOME_CACHE_KEY, JSON.stringify(snapshot));
+    } catch {
+      // Storage is optional.
+    }
+  }, [user, profile, today]);
 
   useEffect(() => {
     loadHomeData();

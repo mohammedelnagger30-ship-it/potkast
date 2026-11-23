@@ -975,6 +975,44 @@ const HOSTS = [
     feedsOnly: true,
     feeds: ["https://feeds.soundcloud.com/users/soundcloud:users:399992814/sounds.rss"],
   },
+
+  /* --- Cybersecurity: three of the best-known hosts in the field --- */
+  {
+    artist: "Jack Rhysider",
+    name_ar: "جاك ريسايدر",
+    slug: "jack-rhysider",
+    title_ar: "",
+    specialty_ar: "قصص حقيقية عن الاختراق والجرائم السيبرانية",
+    country: "أمريكا",
+    type: "technology",
+    typeOverride: "technology",
+    feedsOnly: true,
+    feeds: ["https://podcast.darknetdiaries.com/"],
+  },
+  {
+    artist: "Patrick Gray",
+    name_ar: "باتريك جراي",
+    slug: "patrick-gray",
+    title_ar: "",
+    specialty_ar: "أخبار وتحليلات الأمن السيبراني",
+    country: "أستراليا",
+    type: "technology",
+    typeOverride: "technology",
+    feedsOnly: true,
+    feeds: ["https://risky.biz/feeds/risky-business"],
+  },
+  {
+    artist: "Steve Gibson",
+    name_ar: "ستيف جيبسون",
+    slug: "steve-gibson",
+    title_ar: "",
+    specialty_ar: "الأمن الرقمي والخصوصية",
+    country: "أمريكا",
+    type: "technology",
+    typeOverride: "technology",
+    feedsOnly: true,
+    feeds: ["https://feeds.twit.tv/sn.xml"],
+  },
 ];
 
 const CATEGORY_BY_TYPE = {

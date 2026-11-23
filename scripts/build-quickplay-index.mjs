@@ -29,7 +29,7 @@ const headers = {
   Accept: 'application/json',
 };
 const PAGE = 1000;
-const fields = 'id,podcast_id,title,audio_url,duration_seconds,published_at';
+const fields = 'id,podcast_id,title,audio_url,duration_seconds';
 const firstByPodcast = new Map();
 let offset = 0;
 let pages = 0;
@@ -49,7 +49,6 @@ while (true) {
         title: row.title,
         audio_url: row.audio_url,
         duration_seconds: row.duration_seconds,
-        published_at: row.published_at,
       });
     }
   }

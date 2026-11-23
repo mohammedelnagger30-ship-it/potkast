@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Clean brand background, no third-party/default artwork. -->
-    <item android:drawable="@color/ic_launcher_background" />
-    <!-- Sada waveform only (no text), reusing the launcher foreground. -->
-    <item
-        android:gravity="center"
-        android:drawable="@mipmap/ic_launcher_foreground" />
-</layer-list>
+<!-- Plain background only: no logo, no old artwork, no text. The brief launch
+     window simply matches the app background so it feels like no splash at all. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#FAFAFA" />
+</shape>

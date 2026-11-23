@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Search, Headphones, X, SlidersHorizontal } from 'lucide-react';
 import { Layout } from '@/components/layout';
 import { PodcastCard } from '@/components/PodcastCard';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { supabase } from '@/lib/supabase';
+import { readCatalogCache, writeCatalogCache } from '@/lib/catalogCache';
 import type { Podcast, Category, Episode, ListeningHistory } from '@/types/podcast';
 import { typeLabels, levelLabels, interestToCategoryMap } from '@/types/podcast';
 
@@ -20,10 +21,13 @@ export default function PodcastsPage() {
   const { user, profile } = useAuth();
   const { playEpisode } = useAudioPlayer();
 
-  const [allPodcasts, setAllPodcasts] = useState<Podcast[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  // Paint the last good catalog from localStorage immediately, then refresh it
+  // in the background. The first visit is unchanged; every revisit is instant.
+  const cachedCatalog = useRef(readCatalogCache()).current;
+  const [allPodcasts, setAllPodcasts] = useState<Podcast[]>(cachedCatalog?.podcasts || []);
+  const [categories, setCategories] = useState<Category[]>(cachedCatalog?.categories || []);
   const [continueEpisodes, setContinueEpisodes] = useState<(Episode & { podcast?: Podcast })[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedCatalog);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,17 +55,26 @@ export default function PodcastsPage() {
       user ? supabase.from('favorites').select('podcast_id').eq('user_id', user.id) : Promise.resolve({ data: null }),
     ]);
 
-    if (categoriesData) setCategories(categoriesData as Category[]);
-
     const favSet = new Set<string>();
     (favData || []).forEach((f: { podcast_id: string }) => favSet.add(f.podcast_id));
     setFavorites(favSet);
 
-    const enriched = (podcastsData || []).map((p: Record<string, unknown>) => ({
-      ...p,
-      is_favorited: favSet.has(p.id as string),
-    })) as Podcast[];
-    setAllPodcasts(enriched);
+    if (podcastsData) {
+      const enriched = (podcastsData as Record<string, unknown>[]).map((p) => ({
+        ...p,
+        is_favorited: favSet.has(p.id as string),
+      })) as Podcast[];
+      setAllPodcasts(enriched);
+      // Strip user-specific flags before caching so another account never
+      // inherits the previous user's filled favourite hearts on first paint.
+      const rawPodcasts = enriched.map((p) => {
+        const raw = { ...p };
+        delete raw.is_favorited;
+        return raw;
+      });
+      writeCatalogCache(rawPodcasts, (categoriesData || []) as Category[]);
+    }
+    if (categoriesData) setCategories(categoriesData as Category[]);
     setLoading(false);
   }, [user]);
 

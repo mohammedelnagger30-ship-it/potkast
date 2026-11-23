@@ -1,78 +1,34 @@
 [
   {
-    "name_ar": "بودكاست وسام",
-    "slug": "podcast-wesam",
+    "name_ar": "جاك ريسايدر",
+    "slug": "jack-rhysider",
     "shows": [
       {
-        "title": "بودكاست وسام",
-        "type": "cultural",
-        "episodes": 2
+        "title": "Darknet Diaries",
+        "type": "technology",
+        "episodes": 183
       }
     ]
   },
   {
-    "name_ar": "ثيرابيا",
-    "slug": "therapia",
+    "name_ar": "باتريك جراي",
+    "slug": "patrick-gray",
     "shows": [
       {
-        "title": "ما وراء السلوك",
-        "type": "psychology",
-        "episodes": 2
+        "title": "Risky Business",
+        "type": "technology",
+        "episodes": 100
       }
     ]
   },
   {
-    "name_ar": "إدمان إيجابي",
-    "slug": "positive-addiction",
+    "name_ar": "ستيف جيبسون",
+    "slug": "steve-gibson",
     "shows": [
       {
-        "title": "إدمان إيجابي | Positive Addiction",
-        "type": "psychology",
-        "episodes": 1
-      }
-    ]
-  },
-  {
-    "name_ar": "سارة سيف | فن الإبداع والتواصل",
-    "slug": "empwr-communication",
-    "shows": [
-      {
-        "title": "The Art of Communication & Creativity with Sarah Seif فن الإبداع و التواصل مع منظمة سارة سيف",
-        "type": "professional",
-        "episodes": 8
-      }
-    ]
-  },
-  {
-    "name_ar": "رُقى البلوشي | فن العلاقات",
-    "slug": "fan-al-alaqat",
-    "shows": [
-      {
-        "title": "فن العلاقات",
-        "type": "relationships",
-        "episodes": 10
-      }
-    ]
-  },
-  {
-    "name_ar": "فرانكلين كوفي الشرق الأوسط | عن القيادة",
-    "slug": "franklincovey-leadership",
-    "shows": [
-      {
-        "title": "بودكاست عن القيادة",
-        "type": "leadership",
-        "episodes": 10
-      }
-    ]
-  },
-  {
-    "name_ar": "ارتجال بودكاست",
-    "slug": "irtgal-podcast",
-    "shows": [
-      {
-        "title": "ارتجال بودكاست",
-        "type": "cultural",
-        "episodes": 5
+        "title": "Security Now (Audio)",
+        "type": "technology",
+        "episodes": 20
       }
     ]
   }

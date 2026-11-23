@@ -98,7 +98,7 @@ self.addEventListener('fetch', (event) => {
   const isAsset =
     url.origin === self.location.origin &&
     (url.pathname.startsWith('/assets/') ||
-      ['/icon.svg', '/manifest.webmanifest', '/favicon.ico'].includes(url.pathname));
+      ['/icon.svg', '/manifest.webmanifest', '/favicon.ico', '/first-episodes.json'].includes(url.pathname));
 
   if (isAsset) {
     event.respondWith(
