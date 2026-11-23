@@ -172,6 +172,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const playPrevRef = useRef<() => void>(() => undefined);
   const stopRef = useRef<() => void>(() => undefined);
   const lastNotificationSyncRef = useRef(0);
+  const playbackRateRef = useRef(1);
 
   const [currentEpisode, setCurrentEpisode] = useState<Episode | null>(null);
   const [currentPodcast, setCurrentPodcast] = useState<Podcast | null>(null);
@@ -302,6 +303,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
   // Apply playback rate
   useEffect(() => {
+    playbackRateRef.current = playbackRate;
     if (audioRef.current) {
       audioRef.current.playbackRate = playbackRate;
     }
@@ -584,11 +586,44 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       const audio = audioRef.current;
       if (!audio) return;
       switch (action) {
-        case 'play':
-          if (!currentEpisodeRef.current) return;
+        case 'play': {
+          const ep = currentEpisodeRef.current;
+          if (!ep) return;
           setIsBuffering(true);
-          void audio.play().catch(() => setIsPlaying(false));
+          // After long background pauses the WebView/audio element can end up in a
+          // stalled or empty state; rebuild the source before retrying playback.
+          if (!audio.src || audio.error) {
+            const token = ++playTokenRef.current;
+            const local = isLocalAudioUrl(resolveAudioUrl(ep.audio_url, ep.id));
+            const resumeAt = Math.max(0, Math.floor(audio.currentTime || progressRef.current || 0));
+            const source = sourceFor(ep.id, ep.audio_url, local ? resumeAt : 0);
+            audio.src = source.url;
+            audio.playbackRate = playbackRateRef.current;
+            void audio.play().catch(() => { if (token === playTokenRef.current) setIsPlaying(false); });
+            if (!source.local && resumeAt > 5) {
+              resumeAfterAudible(audio, resumeAt, () => token === playTokenRef.current && audioRef.current === audio);
+            }
+            break;
+          }
+          if (audio.ended) {
+            try { audio.currentTime = 0; } catch { /* ignore */ }
+          }
+          void audio.play().catch(() => {
+            // Retry once with a fresh source - some WebViews drop the media element
+            // after background pause/notification interactions.
+            const token = ++playTokenRef.current;
+            const local = isLocalAudioUrl(resolveAudioUrl(ep.audio_url, ep.id));
+            const resumeAt = Math.max(0, Math.floor(progressRef.current || audio.currentTime || 0));
+            const source = sourceFor(ep.id, ep.audio_url, local ? resumeAt : 0);
+            audio.src = source.url;
+            audio.playbackRate = playbackRateRef.current;
+            void audio.play().catch(() => { if (token === playTokenRef.current) setIsPlaying(false); });
+            if (!source.local && resumeAt > 5) {
+              resumeAfterAudible(audio, resumeAt, () => token === playTokenRef.current && audioRef.current === audio);
+            }
+          });
           break;
+        }
         case 'pause':
           audio.pause();
           break;
