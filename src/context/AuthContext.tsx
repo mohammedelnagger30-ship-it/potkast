@@ -22,7 +22,6 @@ interface AuthContextValue {
   loading: boolean;
   signUp: (email: string, password: string, name: string) => Promise<{ error: string | null; needsConfirmation: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateProfile: (patch: Partial<Profile>) => Promise<{ error: string | null }>;
@@ -243,16 +242,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
-  const signInWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    if (error) return { error: error.message };
-    return { error: null };
-  };
 
   const signOut = async () => {
     manualSignOutRef.current = true;
@@ -301,7 +290,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         signUp,
         signIn,
-        signInWithGoogle,
         signOut,
         refreshProfile,
         updateProfile,
