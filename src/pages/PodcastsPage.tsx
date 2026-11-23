@@ -12,7 +12,7 @@ import { readCatalogCache, writeCatalogCache } from '@/lib/catalogCache';
 import type { Podcast, Category, Episode, ListeningHistory } from '@/types/podcast';
 import { typeLabels, levelLabels, interestToCategoryMap } from '@/types/podcast';
 
-type FilterType = 'all' | 'religious' | 'scientific' | 'cultural' | 'motivational' | 'professional';
+type FilterType = 'all' | 'religious' | 'scientific' | 'cultural' | 'motivational' | 'professional' | 'comedy' | 'leadership' | 'communication' | 'improv';
 type FilterLevel = 'all' | 'beginner' | 'intermediate' | 'expert';
 
 const PAGE_SIZE = 24;
@@ -264,7 +264,7 @@ export default function PodcastsPage() {
             <div>
               <p className="text-sm font-bold text-neutral-700 dark:text-neutral-300 mb-2">النوع</p>
               <div className="flex flex-wrap gap-2">
-                {(['all', 'religious', 'scientific', 'cultural', 'motivational', 'professional'] as FilterType[]).map((t) => (
+                {(['all', 'religious', 'scientific', 'cultural', 'motivational', 'professional', 'comedy', 'leadership', 'communication', 'improv'] as FilterType[]).map((t) => (
                   <button
                     key={t}
                     onClick={() => setFilterType(t)}

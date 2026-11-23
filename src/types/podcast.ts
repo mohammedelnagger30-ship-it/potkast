@@ -45,7 +45,7 @@ export interface Podcast {
   plays_count: number;
   rating_avg: number;
   category_id: string;
-  type: 'religious' | 'scientific' | 'cultural' | 'motivational' | 'professional';
+  type: 'religious' | 'scientific' | 'cultural' | 'motivational' | 'professional' | 'comedy' | 'leadership' | 'communication' | 'improv';
   cover_url: string;
   audience_level: 'beginner' | 'intermediate' | 'expert';
   created_at: string;
@@ -91,6 +91,10 @@ export const typeLabels: Record<string, string> = {
   cultural: 'ثقافي',
   motivational: 'تحفيزي',
   professional: 'مهني',
+  comedy: 'كوميدي',
+  leadership: 'قيادة',
+  communication: 'فن التواصل',
+  improv: 'ارتجال',
 };
 
 export const levelLabels: Record<string, string> = {
