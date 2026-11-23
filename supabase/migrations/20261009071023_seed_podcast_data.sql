@@ -37,7 +37,7 @@ DECLARE
   v_career uuid; v_finance uuid; v_family uuid; v_mental uuid;
   v_leadership uuid; v_tech uuid;
   v_podcast_id uuid;
-  v_audio text := 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+  v_audio text := 'https://www.buzzsprout.com/2196707/episodes/20137689-84.mp3';
 BEGIN
   SELECT id INTO v_spiritual FROM categories WHERE name_ar = 'روحاني / ديني' LIMIT 1;
   SELECT id INTO v_science FROM categories WHERE name_ar = 'العلوم' LIMIT 1;

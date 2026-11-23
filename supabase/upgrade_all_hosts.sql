@@ -14,7 +14,7 @@
 
 DO $$
 DECLARE
-  v_audio text := 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+  v_audio text := 'https://www.buzzsprout.com/2196707/episodes/20137689-84.mp3';
   v_cat_culture   uuid;
   v_cat_science   uuid;
   v_cat_mental    uuid;
@@ -255,7 +255,7 @@ END $$;
 
 DO $$
 DECLARE
-  v_audio text := 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+  v_audio text := 'https://www.buzzsprout.com/2196707/episodes/20137689-84.mp3';
   v_host RECORD;
   v_existing int;
   v_index int;
@@ -346,7 +346,7 @@ END $$;
 
 DO $$
 DECLARE
-  v_audio text := 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+  v_audio text := 'https://www.buzzsprout.com/2196707/episodes/20137689-84.mp3';
   v_pod RECORD;
   v_count int;
   v_k int;

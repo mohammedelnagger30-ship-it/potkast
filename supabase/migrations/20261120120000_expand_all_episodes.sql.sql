@@ -8,7 +8,7 @@
 
 DO $$
 DECLARE
-  v_audio text := 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+  v_audio text := 'https://www.buzzsprout.com/2196707/episodes/20137689-84.mp3';
   v_pod RECORD;
   v_count int;
   v_k int;

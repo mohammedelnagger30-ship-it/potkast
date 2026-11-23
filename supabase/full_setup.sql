@@ -329,7 +329,7 @@ DECLARE
   v_career uuid; v_finance uuid; v_family uuid; v_mental uuid;
   v_leadership uuid; v_tech uuid;
   v_podcast_id uuid;
-  v_audio text := 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+  v_audio text := 'https://www.buzzsprout.com/2196707/episodes/20137689-84.mp3';
 BEGIN
   SELECT id INTO v_spiritual FROM categories WHERE name_ar = 'روحاني / ديني' LIMIT 1;
   SELECT id INTO v_science FROM categories WHERE name_ar = 'العلوم' LIMIT 1;
@@ -1915,7 +1915,7 @@ UPDATE hosts SET slug = 'asmaa-alzahrani', title_ar = 'أستاذة', specialty_
 
 DO $$
 DECLARE
-  v_audio text := 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+  v_audio text := 'https://www.buzzsprout.com/2196707/episodes/20137689-84.mp3';
   v_podcast_id uuid;
 BEGIN
   -- d. ماجد العتيبي (science)
@@ -2000,7 +2000,7 @@ END $$;
 
 DO $$
 DECLARE
-  v_audio text := 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+  v_audio text := 'https://www.buzzsprout.com/2196707/episodes/20137689-84.mp3';
   v_cat_tech uuid;
   v_cat_mental uuid;
   v_cat_health uuid;
@@ -2637,7 +2637,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO anon;
 
 DO $$
 DECLARE
-  v_audio text := 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+  v_audio text := 'https://www.buzzsprout.com/2196707/episodes/20137689-84.mp3';
   v_cat_culture   uuid;
   v_cat_science   uuid;
   v_cat_mental    uuid;
@@ -2879,7 +2879,7 @@ END $$;
 
 DO $$
 DECLARE
-  v_audio text := 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+  v_audio text := 'https://www.buzzsprout.com/2196707/episodes/20137689-84.mp3';
   v_host RECORD;
   v_existing int;
   v_index int;
@@ -2970,7 +2970,7 @@ END $$;
 
 DO $$
 DECLARE
-  v_audio text := 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+  v_audio text := 'https://www.buzzsprout.com/2196707/episodes/20137689-84.mp3';
   v_pod RECORD;
   v_count int;
   v_k int;
