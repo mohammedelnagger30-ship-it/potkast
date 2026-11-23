@@ -1,4 +1,8 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import {
+  cancelNativeDownload, deleteNativeDownload, getNativeDownloadStatus,
+  localSourceForNativeUri, startNativeDownload,
+} from './nativeDownload';
 
 export type DownloadStatus = 'queued' | 'downloading' | 'done' | 'error' | 'canceled';
 
@@ -16,8 +20,10 @@ export interface DownloadRecord {
   status: DownloadStatus;
   error?: string;
   createdAt: number;
-  /** blob = readable file in IndexedDB, cache = opaque response in the SW cache */
-  storage?: 'blob' | 'cache';
+  /** blob = IndexedDB, cache = opaque SW response, native = Android DownloadManager file */
+  storage?: 'blob' | 'cache' | 'native';
+  nativeId?: number;
+  nativeUri?: string;
 }
 
 interface StoredFile {
@@ -88,6 +94,13 @@ export function isDownloaded(episodeId: string): boolean {
   return localUrls.has(episodeId) || swCached.has(episodeId);
 }
 
+/** Remember a native file path so playback resolves instantly, even after a restart. */
+export function registerNativeFile(episodeId: string, uri: string): string {
+  const source = localSourceForNativeUri(uri);
+  if (source) localUrls.set(episodeId, source);
+  return source;
+}
+
 /** Mark a file kept as an opaque response in the service worker cache. */
 export function markSwCached(episodeId: string) {
   swCached.add(episodeId);
@@ -115,17 +128,32 @@ export function cacheAudioInServiceWorker(episodeId: string, url: string): Promi
   });
 }
 
-/** Create blob URLs for files that survived a previous app session. */
+/** Restore playback URLs without loading every saved file into memory. */
 export async function hydrateLocalUrls(): Promise<void> {
   try {
     const db = await getDb();
-    const files = await db.getAll('files');
-    for (const file of files) {
-      if (!localUrls.has(file.id)) localUrls.set(file.id, URL.createObjectURL(file.blob));
-    }
     const metas = await db.getAll('meta');
+    const blobIds = new Set<string>();
+
     for (const meta of metas) {
-      if (meta.storage === 'cache' && meta.status === 'done') swCached.add(meta.id);
+      if (meta.status !== 'done') continue;
+      if (meta.storage === 'native' && meta.nativeUri) {
+        registerNativeFile(meta.episodeId, meta.nativeUri);
+      } else if (meta.storage === 'cache') {
+        swCached.add(meta.episodeId);
+      } else {
+        blobIds.add(meta.id);
+      }
+    }
+
+    // Old blob downloads still need an object URL, but native files never do.
+    if (blobIds.size) {
+      const files = await db.getAll('files');
+      for (const file of files) {
+        if (blobIds.has(file.id) && !localUrls.has(file.id)) {
+          localUrls.set(file.id, URL.createObjectURL(file.blob));
+        }
+      }
     }
   } catch {
     // IndexedDB can be unavailable in private browsing; downloads stay disabled.
@@ -148,8 +176,11 @@ export async function deleteDownload(episodeId: string): Promise<void> {
   const db = await getDb();
   await db.delete('meta', episodeId);
   await db.delete('files', episodeId);
+  void deleteNativeDownload(episodeId).catch(() => undefined);
   const url = localUrls.get(episodeId);
-  if (url) URL.revokeObjectURL(url);
+  if (url && !url.startsWith(OFFLINE_AUDIO_PREFIX) && !url.includes('/_capacitor_')) {
+    URL.revokeObjectURL(url);
+  }
   localUrls.delete(episodeId);
   swCached.delete(episodeId);
   clearSwAudio(episodeId);
@@ -176,40 +207,128 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1024 ** i).toFixed(i ? 1 : 0)} ${units[i]}`;
 }
 
-/** Stream a real episode audio file into IndexedDB. */
-export async function downloadAudio(
+const RANGE_CHUNK = 4 * 1024 * 1024;
+const RANGE_WORKERS = 5;
+const RANGE_UNSUPPORTED = 'RANGE_UNSUPPORTED';
+
+type ProgressFn = (progress: number, loaded: number, total: number) => void;
+
+async function probeByteRanges(url: string, signal: AbortSignal) {
+  const controller = new AbortController();
+  const forwardAbort = () => controller.abort();
+  if (signal.aborted) controller.abort();
+  else signal.addEventListener('abort', forwardAbort, { once: true });
+
+  try {
+    const response = await fetch(url, {
+      headers: { Range: 'bytes=0-0' },
+      signal: controller.signal,
+      credentials: 'omit',
+    });
+    if (response.status !== 206) {
+      // The server ignored Range; cancel the body so we do not waste bandwidth.
+      void response.body?.cancel().catch(() => undefined);
+      return null;
+    }
+    const total = Number((response.headers.get('content-range') || '').split('/').pop() || 0);
+    const mime = response.headers.get('content-type')?.split(';')[0] || '';
+    void response.body?.cancel().catch(() => undefined);
+    return Number.isFinite(total) && total > 1 ? { total, mime } : null;
+  } catch (error) {
+    if (signal.aborted) throw error;
+    return null;
+  } finally {
+    signal.removeEventListener('abort', forwardAbort);
+  }
+}
+
+async function downloadSingle(
   record: DownloadRecord,
-  onProgress: (progress: number, loaded: number, total: number) => void,
-  signal: AbortSignal
-): Promise<DownloadRecord> {
+  onProgress: ProgressFn,
+  signal: AbortSignal,
+  mimeHint: string,
+) {
   const response = await fetch(record.audioUrl, { signal, credentials: 'omit' });
   if (!response.ok) throw new Error(`فشل التنزيل (${response.status})`);
 
   const total = Number(response.headers.get('content-length') || 0);
-  const mime = response.headers.get('content-type')?.split(';')[0] || record.mime || 'audio/mpeg';
-  let blob: Blob;
+  const mime = response.headers.get('content-type')?.split(';')[0] || mimeHint || 'audio/mpeg';
 
-  if (response.body) {
-    const reader = response.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let loaded = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      loaded += value.byteLength;
-      onProgress(total ? Math.min(1, loaded / total) : 0, loaded, total);
-    }
-    blob = new Blob(chunks as BlobPart[], { type: mime });
-  } else {
+  if (!response.body) {
     const buffer = await response.arrayBuffer();
-    blob = new Blob([buffer], { type: mime });
-    onProgress(1, buffer.byteLength, buffer.byteLength);
+    onProgress(1, buffer.byteLength, buffer.byteLength || total);
+    return { blob: new Blob([buffer], { type: mime }), mime, total: buffer.byteLength || total };
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let loaded = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.byteLength;
+    onProgress(total ? Math.min(1, loaded / total) : 0, loaded, total);
+  }
+  return { blob: new Blob(chunks as BlobPart[], { type: mime }), mime, total: loaded || total };
+}
+
+/** Download a real episode in parallel byte ranges when the host allows it. */
+export async function downloadAudio(
+  record: DownloadRecord,
+  onProgress: ProgressFn,
+  signal: AbortSignal
+): Promise<DownloadRecord> {
+  const probe = await probeByteRanges(record.audioUrl, signal);
+  let blob: Blob | null = null;
+  let total = probe?.total || 0;
+  let mime = probe?.mime || record.mime || 'audio/mpeg';
+
+  if (probe) {
+    const count = Math.ceil(probe.total / RANGE_CHUNK);
+    const parts = new Array<ArrayBuffer>(count);
+    let next = 0;
+    let loaded = 0;
+
+    try {
+      await Promise.all(
+        Array.from({ length: Math.min(RANGE_WORKERS, count) }, async () => {
+          while (true) {
+            const index = next++;
+            if (index >= count) return;
+            const start = index * RANGE_CHUNK;
+            const end = Math.min(start + RANGE_CHUNK, probe.total) - 1;
+            const response = await fetch(record.audioUrl, {
+              headers: { Range: `bytes=${start}-${end}` },
+              signal,
+              credentials: 'omit',
+            });
+            if (response.status !== 206) throw new Error(RANGE_UNSUPPORTED);
+            const buffer = await response.arrayBuffer();
+            parts[index] = buffer;
+            loaded += buffer.byteLength;
+            onProgress(Math.min(1, loaded / probe.total), loaded, probe.total);
+          }
+        }),
+      );
+      blob = new Blob(parts as BlobPart[], { type: mime });
+    } catch (error) {
+      if (signal.aborted) throw error;
+      if (!(error instanceof Error) || error.message !== RANGE_UNSUPPORTED) throw error;
+      // Server changed its mind mid-transfer — fall back to one normal stream.
+    }
+  }
+
+  if (!blob) {
+    const single = await downloadSingle(record, onProgress, signal, mime);
+    blob = single.blob;
+    mime = single.mime;
+    total = single.total;
   }
 
   const db = await getDb();
   const previousUrl = localUrls.get(record.id);
-  if (previousUrl) URL.revokeObjectURL(previousUrl);
+  if (previousUrl && !previousUrl.includes('/_capacitor_')) URL.revokeObjectURL(previousUrl);
   await db.put('files', { id: record.id, blob, mime, createdAt: Date.now() });
   localUrls.set(record.id, URL.createObjectURL(blob));
 
@@ -217,7 +336,7 @@ export async function downloadAudio(
     ...record,
     status: 'done',
     progress: 1,
-    size: blob.size,
+    size: blob.size || total,
     mime,
     error: undefined,
     storage: 'blob',
@@ -225,6 +344,95 @@ export async function downloadAudio(
   await db.put('meta', done);
   notifyDownloadsChanged();
   return done;
+}
+
+/** Android path: DownloadManager streams to disk and survives backgrounding. */
+export async function downloadAudioNative(
+  record: DownloadRecord,
+  onProgress: ProgressFn,
+  signal: AbortSignal
+): Promise<DownloadRecord> {
+  const started = await startNativeDownload({
+    url: record.audioUrl,
+    episodeId: record.id,
+    title: record.episodeTitle,
+  });
+
+  const finish = (uri: string, total: number): DownloadRecord => {
+    const source = registerNativeFile(record.id, uri);
+    const done: DownloadRecord = {
+      ...record,
+      status: 'done',
+      progress: 1,
+      size: total || record.size,
+      mime: record.mime || 'audio/mpeg',
+      nativeId: started.id > 0 ? started.id : undefined,
+      nativeUri: uri,
+      error: undefined,
+      storage: 'native',
+    };
+    if (!source) throw new Error('تعذر فتح الملف المحمّل');
+    return done;
+  };
+
+  if (started.status === 'SUCCESSFUL' && started.uri) {
+    return finish(started.uri, started.total || record.size);
+  }
+
+  return new Promise<DownloadRecord>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      window.clearInterval(timer);
+      signal.removeEventListener('abort', onAbort);
+    };
+    const onAbort = () => {
+      void cancelNativeDownload(started.id, record.id).catch(() => undefined);
+      if (!settled) {
+        settled = true;
+        cleanup();
+        reject(new Error('canceled'));
+      }
+    };
+
+    const poll = async () => {
+      if (settled) return;
+      try {
+        const state = await getNativeDownloadStatus(started.id, record.id);
+        if (settled) return;
+        if (signal.aborted) {
+          onAbort();
+          return;
+        }
+        const knownTotal = state.total || started.total || 0;
+        const progress = knownTotal > 0
+          ? Math.min(1, (state.bytes || 0) / knownTotal)
+          : state.status === 'SUCCESSFUL' ? 1 : 0.02;
+        onProgress(progress, state.bytes || 0, knownTotal);
+
+        if (state.status === 'SUCCESSFUL') {
+          if (!state.uri) throw new Error('فشل التنزيل — الملف غير متاح');
+          const done = finish(state.uri, knownTotal);
+          const db = await getDb();
+          await db.put('meta', done);
+          notifyDownloadsChanged();
+          settled = true;
+          cleanup();
+          resolve(done);
+        } else if (state.status === 'FAILED') {
+          throw new Error('تعذر تنزيل الملف على الجهاز — جرّب مرة تانية');
+        }
+      } catch (error) {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      }
+    };
+
+    const timer = window.setInterval(() => { void poll(); }, 450);
+    signal.addEventListener('abort', onAbort, { once: true });
+    void poll();
+  });
 }
 
 export function recordFromEpisode(

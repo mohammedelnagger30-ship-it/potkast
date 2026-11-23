@@ -8,16 +8,156 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0F6E56" />
     <meta name="description" content="Sada — منصة البودكاست العربية" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: var(--boot-bg, #fafafa);
+      }
+
+      #boot-shell {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--boot-bg, #fafafa);
+        color: var(--boot-fg, #525252);
+        font-family: Cairo, Tajawal, system-ui, sans-serif;
+        pointer-events: none;
+        transition: opacity 180ms ease-out;
+      }
+
+      #boot-shell.is-ready {
+        opacity: 0;
+      }
+
+      .boot-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+        padding: 28px 34px;
+        border-radius: 24px;
+        background: var(--boot-card, #fff);
+        box-shadow: 0 14px 40px rgba(15, 23, 42, 0.07);
+      }
+
+      .boot-wave {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        height: 34px;
+      }
+
+      .boot-wave i {
+        display: block;
+        width: 5px;
+        border-radius: 999px;
+        background: var(--boot-primary, #0f766e);
+        animation: boot-wave 900ms ease-in-out infinite alternate;
+      }
+
+      .boot-wave i:nth-child(1) { height: 13px; animation-delay: -520ms; }
+      .boot-wave i:nth-child(2) { height: 24px; animation-delay: -340ms; }
+      .boot-wave i:nth-child(3) { height: 32px; animation-delay: -160ms; }
+      .boot-wave i:nth-child(4) { height: 20px; animation-delay: -660ms; }
+      .boot-wave i:nth-child(5) {
+        height: 11px;
+        background: var(--boot-accent, #d4a017);
+        animation-delay: -80ms;
+      }
+
+      .boot-label {
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .boot-track {
+        width: 104px;
+        height: 3px;
+        border-radius: 999px;
+        background: var(--boot-track, #e5e5e5);
+        overflow: hidden;
+      }
+
+      .boot-track::after {
+        content: '';
+        display: block;
+        width: 42%;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--boot-primary, #0f766e);
+        animation: boot-slide 1.1s ease-in-out infinite;
+      }
+
+      @keyframes boot-wave {
+        from { transform: scaleY(0.45); opacity: 0.55; }
+        to { transform: scaleY(1); opacity: 1; }
+      }
+
+      @keyframes boot-slide {
+        from { transform: translateX(-105%); }
+        to { transform: translateX(245%); }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .boot-wave i,
+        .boot-track::after {
+          animation: none;
+        }
+      }
+    </style>
     <script>
-      // Paint with the saved mode instantly, before React mounts.
-      try {
-        var savedMode = localStorage.getItem('nammy-theme');
-        var dark = savedMode === 'dark' || (!savedMode && matchMedia('(prefers-color-scheme: dark)').matches);
-        if (dark) document.documentElement.classList.add('dark');
-        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
-        var savedTheme = localStorage.getItem('nammy-color-theme');
-        if (savedTheme) document.documentElement.dataset.colorTheme = savedTheme;
-      } catch (e) {}
+      // Paint the correct theme and a calm loading state before React/CSS load.
+      // No logo, app name, image or branding lives in this shell.
+      (function () {
+        var root = document.documentElement;
+        var read = function (key) {
+          try { return localStorage.getItem(key); } catch (e) { return null; }
+        };
+
+        var savedMode = read('nammy-theme');
+        var dark = savedMode === 'dark' ||
+          (!savedMode && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+        root.classList.toggle('dark', !!dark);
+        root.style.colorScheme = dark ? 'dark' : 'light';
+
+        var presets = {
+          emerald: ['#0F766E', '#D4A017'],
+          violet: ['#7C3AED', '#F43F5E'],
+          blue: ['#2563EB', '#D97706'],
+          rose: ['#E11D48', '#8B5CF6'],
+          sky: ['#0284C7', '#D4A017'],
+          amber: ['#D97706', '#0F766E']
+        };
+
+        var savedTheme = read('nammy-color-theme');
+        var themeId = presets[savedTheme] || (savedTheme === 'custom' ? 'custom' : 'emerald');
+        var pair = presets[themeId] || presets.emerald;
+
+        if (themeId === 'custom') {
+          try {
+            var custom = JSON.parse(read('nammy-custom-colors') || '{}');
+            if (custom.primary) pair[0] = custom.primary;
+            if (custom.accent) pair[1] = custom.accent;
+          } catch (e) {}
+        }
+
+        root.dataset.colorTheme = themeId;
+        root.style.setProperty('--boot-primary', pair[0]);
+        root.style.setProperty('--boot-accent', pair[1]);
+        root.style.setProperty('--boot-bg', dark ? '#0A0A0A' : '#FAFAFA');
+        root.style.setProperty('--boot-card', dark ? '#171717' : '#FFFFFF');
+        root.style.setProperty('--boot-fg', dark ? '#D4D4D4' : '#525252');
+        root.style.setProperty('--boot-track', dark ? '#262626' : '#E5E5E5');
+
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.content = pair[0];
+      })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -50,8 +190,15 @@
     <meta property="og:image" content="https://bolt.new/static/og_default.png">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
-</head>
+  </head>
   <body>
+    <div id="boot-shell" role="status" aria-live="polite" aria-label="جارٍ تجهيز التطبيق">
+      <div class="boot-card" aria-hidden="true">
+        <div class="boot-wave"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="boot-track"></div>
+        <div class="boot-label">جارٍ التجهيز...</div>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { AppLoading } from '@/components/AppLoading';
 import HomePage from '@/pages/HomePage';
 import AuthPage from '@/pages/AuthPage';
 import OnboardingPage from '@/pages/OnboardingPage';
@@ -32,11 +33,7 @@ function OnboardingGuard({ children }: { children: ReactNode }) {
   const { profile, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-neutral-50 dark:bg-neutral-950">
-        <div className="w-12 h-12 rounded-full border-4 border-primary-600 border-t-transparent animate-spin" />
-      </div>
-    );
+    return <AppLoading fullScreen label="جارٍ تجهيز رحلتك..." />;
   }
 
   if (profile && !profile.onboarded) {
@@ -47,11 +44,7 @@ function OnboardingGuard({ children }: { children: ReactNode }) {
 }
 
 function RouteFallback() {
-  return (
-    <div className="flex items-center justify-center min-h-[60vh]" role="status" aria-label="جارٍ فتح الصفحة">
-      <div className="w-8 h-8 rounded-full border-4 border-primary-600 border-t-transparent animate-spin" />
-    </div>
-  );
+  return <AppLoading label="جارٍ فتح الصفحة..." />;
 }
 
 function App() {

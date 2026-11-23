@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches the web boot shell in light mode. -->
+    <color name="nammy_launch_background">#FAFAFA</color>
+</resources>

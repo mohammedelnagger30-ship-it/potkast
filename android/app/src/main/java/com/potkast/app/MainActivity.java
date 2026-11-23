@@ -10,6 +10,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(UpdatePlugin.class);
         registerPlugin(TextScalePlugin.class);
+        registerPlugin(MediaNotificationPlugin.class);
+        registerPlugin(AudioDownloadPlugin.class);
         super.onCreate(savedInstanceState);
         applyTextScale();
     }

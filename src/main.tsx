@@ -18,6 +18,17 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// The inline boot shell owns the very first paint. Hand over only after React
+// has produced a frame so the user never sees an empty #root.
+function finishBoot() {
+  const shell = document.getElementById('boot-shell');
+  if (!shell || shell.classList.contains('is-ready')) return;
+  shell.classList.add('is-ready');
+  const remove = () => shell.remove();
+  shell.addEventListener('transitionend', remove, { once: true });
+  window.setTimeout(remove, 260);
+}
+
 // Fetch the real-catalog play index after the first paint. By the time the
 // user reaches a podcast list, play buttons can start audio synchronously.
 const startIndexLoad = () => { void loadQuickPlayIndex(); };
@@ -51,3 +62,5 @@ createRoot(document.getElementById('root')!).render(
     </ThemeProvider>
   </StrictMode>
 );
+
+window.requestAnimationFrame(() => window.requestAnimationFrame(finishBoot));

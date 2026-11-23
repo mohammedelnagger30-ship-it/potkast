@@ -4,6 +4,26 @@ import type { Episode, Podcast } from '@/types/podcast';
 
 type PodcastRef = Podcast | { id: string; title: string } | null;
 
+const RING_LENGTH = 2 * Math.PI * 9;
+
+function ProgressRing({ value }: { value: number }) {
+  const pct = Math.max(0, Math.min(100, Math.round(value * 100)));
+  return (
+    <span className="relative inline-flex items-center justify-center flex-shrink-0">
+      <svg width="22" height="22" viewBox="0 0 24 24" className="-rotate-90" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" fill="none" strokeWidth="2.5"
+          className="text-neutral-200 dark:text-neutral-700" stroke="currentColor" />
+        <circle cx="12" cy="12" r="9" fill="none" strokeWidth="2.5" strokeLinecap="round"
+          className="text-primary-600 dark:text-primary-400" stroke="currentColor"
+          strokeDasharray={`${(pct / 100) * RING_LENGTH} ${RING_LENGTH}`} />
+      </svg>
+      <span className="absolute text-[8px] font-extrabold text-primary-700 dark:text-primary-300">
+        {pct}
+      </span>
+    </span>
+  );
+}
+
 export function DownloadButton({
   episode,
   podcast,
@@ -39,14 +59,23 @@ export function DownloadButton({
   }`;
 
   if (busy) {
+    const progress = record?.progress || 0;
+    const pct = Math.round(progress * 100);
     return (
       <button
         onClick={() => cancel(episode.id)}
-        title={opaque ? 'إلغاء التنزيل — جارٍ الحفظ' : `إلغاء التنزيل — ${Math.round((record?.progress || 0) * 100)}%`}
+        title={opaque ? 'إلغاء التنزيل — جارٍ الحفظ' : `إلغاء التنزيل — ${pct}%`}
+        aria-label={`إلغاء التنزيل — ${pct}%`}
         className={`${base} text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30`}
       >
-        <Loader2 size={compact ? 18 : 16} className="animate-spin" />
-        {!compact && (opaque ? 'جارٍ التنزيل' : `${Math.round((record?.progress || 0) * 100)}%`)}
+        {compact ? (
+          <ProgressRing value={progress} />
+        ) : (
+          <>
+            <Loader2 size={16} className="animate-spin" />
+            {opaque ? 'جارٍ التنزيل' : `${pct}%`}
+          </>
+        )}
       </button>
     );
   }

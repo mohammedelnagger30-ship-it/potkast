@@ -140,10 +140,28 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
   }, [lastCheckedAt]);
 
   useEffect(() => {
-    // GitHub is not on the critical path of opening the app. Wait until the
-    // first screen has painted so the release check cannot delay playback.
-    const timer = window.setTimeout(() => { void checkForUpdates(false); }, 2500);
-    return () => window.clearTimeout(timer);
+    // GitHub is not on the critical path of opening the app. Wait for real idle
+    // time so the release check cannot steal bandwidth from the first screen.
+    let cancelled = false;
+    const run = () => { if (!cancelled) void checkForUpdates(false); };
+    const win = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    if (typeof win.requestIdleCallback === 'function') {
+      const idleId = win.requestIdleCallback(run, { timeout: 6000 });
+      return () => {
+        cancelled = true;
+        win.cancelIdleCallback?.(idleId);
+      };
+    }
+
+    const timer = window.setTimeout(run, 2000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [checkForUpdates]);
 
   useEffect(() => {

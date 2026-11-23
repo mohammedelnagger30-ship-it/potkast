@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Plain background only: no logo, no old artwork, no text. The brief launch
-     window simply matches the app background so it feels like no splash at all. -->
+<!-- Plain background only: no logo, no old artwork, no text. It follows the
+     system light/dark setting so the brief launch window never flashes white
+     for users who saved the dark theme. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#FAFAFA" />
+    <solid android:color="@color/nammy_launch_background" />
 </shape>

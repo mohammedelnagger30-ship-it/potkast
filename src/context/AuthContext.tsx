@@ -160,6 +160,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         saveProfileCache(null);
       }
       setLoading(false);
+    }).catch(() => {
+      // A storage/auth failure must never leave the app spinning forever.
+      saveProfileCache(null);
+      setLoading(false);
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, newSession) => {

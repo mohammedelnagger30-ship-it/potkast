@@ -4,10 +4,11 @@ import {
 import { supabase } from '@/lib/supabase';
 import type { Episode } from '@/types/podcast';
 import {
-  cacheAudioInServiceWorker, deleteDownload, downloadAudio, hydrateLocalUrls, isDownloaded,
-  listDownloads, localUrlFor, markSwCached, prefersServiceWorker, recordFromEpisode,
+  cacheAudioInServiceWorker, deleteDownload, downloadAudio, downloadAudioNative, hydrateLocalUrls,
+  isDownloaded, listDownloads, localUrlFor, markSwCached, prefersServiceWorker, recordFromEpisode,
   saveDownloadMeta, storageInfo, type DownloadRecord,
 } from '@/lib/downloads';
+import { canUseNativeDownloads } from '@/lib/nativeDownload';
 
 const MAX_CONCURRENT = 2;
 const PAGE_SIZE = 1000;
@@ -62,7 +63,25 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
     controllersRef.current.set(record.id, controller);
     patch(record.id, { status: 'downloading', progress: 0, error: undefined }, false);
 
-    const opaqueOnly = prefersServiceWorker(record.audioUrl);
+    // On Android the system downloader streams to disk and keeps going in the
+    // background. Browsers keep the existing fetch/IndexedDB path.
+    const native = canUseNativeDownloads();
+    const opaqueOnly = !native && prefersServiceWorker(record.audioUrl);
+    let lastUi = 0;
+    let lastPersist = 0;
+
+    const report = (progress: number, loaded: number) => {
+      const now = Date.now();
+      const final = progress >= 1;
+      // Network chunks arrive many times a second; repainting on each one was
+      // the main reason long downloads felt frozen.
+      if (!final && now - lastUi < 120) return;
+      lastUi = now;
+      const persist = final || now - lastPersist > 1500;
+      if (persist) lastPersist = now;
+      patch(record.id, { progress, size: loaded || record.size }, persist);
+    };
+
     const saveOpaque = async () => {
       patch(record.id, { status: 'downloading', progress: 0.05, error: undefined }, false);
       await cacheAudioInServiceWorker(record.id, record.audioUrl);
@@ -73,39 +92,53 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
       }, true);
     };
 
-    let lastPersist = 0;
-    try {
+    const runWeb = async () => {
       if (opaqueOnly) {
-        // Known CORS-only CDNs: skip the doomed fetch so the console stays clean.
         await saveOpaque();
       } else {
-        const done = await downloadAudio(record, (progress, loaded) => {
-          const now = Date.now();
-          const shouldPersist = now - lastPersist > 1500;
-          if (shouldPersist) lastPersist = now;
-          patch(record.id, { progress, size: loaded || record.size }, shouldPersist);
-        }, controller.signal);
+        const done = await downloadAudio(record, report, controller.signal);
         patch(record.id, done, true);
+      }
+    };
+
+    const fail = (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'تعذر إكمال التنزيل';
+      patch(record.id, { status: 'error', error: message }, true);
+    };
+
+    try {
+      if (native) {
+        const done = await downloadAudioNative(record, report, controller.signal);
+        patch(record.id, done, true);
+      } else {
+        await runWeb();
       }
     } catch (err) {
       if (controller.signal.aborted) {
         patch(record.id, { status: 'canceled', progress: 0 }, true);
-      } else if (opaqueOnly) {
-        const message = err instanceof Error ? err.message : 'تعذر حفظ الملف';
-        patch(record.id, { status: 'error', error: message }, true);
+      } else if (native) {
+        // Native transfer failed — try the browser downloader, then opaque SW.
+        try {
+          const done = await downloadAudio(record, report, controller.signal);
+          patch(record.id, done, true);
+        } catch {
+          try {
+            await saveOpaque();
+          } catch (fallbackError) {
+            fail(fallbackError);
+          }
+        }
       } else {
         const raw = err instanceof Error ? err.message : 'تعذر إكمال التنزيل';
         const maybeCors = /failed to fetch|networkerror|load failed/i.test(raw);
         if (maybeCors) {
-          // Unexpected CORS CDN: let the service worker cache the no-cors response.
           try {
             await saveOpaque();
           } catch (fallbackError) {
-            const message = fallbackError instanceof Error ? fallbackError.message : 'تعذر حفظ الملف';
-            patch(record.id, { status: 'error', error: message }, true);
+            fail(fallbackError);
           }
         } else {
-          patch(record.id, { status: 'error', error: raw }, true);
+          fail(err);
         }
       }
     } finally {

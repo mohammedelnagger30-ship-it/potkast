@@ -3,6 +3,14 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { updateStatsOnListen } from '@/lib/statsHelper';
 import { localUrlFor, OFFLINE_AUDIO_PREFIX } from '@/lib/downloads';
+import {
+  isMediaNotificationSupported,
+  listenMediaNotificationActions,
+  startMediaNotification,
+  stopMediaNotification,
+  syncMediaNotification,
+  type MediaTrack,
+} from '@/lib/mediaNotification';
 import { notifyProgressChanged, PROGRESS_CHANGED_EVENT } from '@/lib/progress';
 import type { Episode, Podcast } from '@/types/podcast';
 
@@ -78,6 +86,11 @@ function resolveAudioUrl(url?: string | null, episodeId?: string): string {
   return (episodeId && localUrlFor(episodeId)) || url || '';
 }
 
+function notificationArtist(episode: Episode | null, podcast: Podcast | null): string {
+  return episode?.podcast?.title || podcast?.title || episode?.podcast?.host_name
+    || podcast?.host_name || 'Sada';
+}
+
 // ProgressContext keeps a local copy of listening_history. Reading it here
 // means playback can start from the saved position in one request, instead of
 // starting from zero and seeking later (which forces a second range request).
@@ -91,7 +104,11 @@ function withStartAt(url: string, seconds: number): string {
 }
 
 function isLocalAudioUrl(url: string): boolean {
-  return url.startsWith('blob:') || url.startsWith(OFFLINE_AUDIO_PREFIX) || url.startsWith('/');
+  return url.startsWith('blob:')
+    || url.startsWith(OFFLINE_AUDIO_PREFIX)
+    || url.startsWith('/')
+    || url.includes('/_capacitor_file_')
+    || url.includes('/_capacitor_content_');
 }
 
 /**
@@ -149,6 +166,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   // Incremented whenever the source changes so a slow history lookup can't
   // seek a later episode or override a newer user action.
   const playTokenRef = useRef(0);
+  const currentEpisodeRef = useRef<Episode | null>(null);
+  const currentPodcastRef = useRef<Podcast | null>(null);
+  const playNextRef = useRef<() => void>(() => undefined);
+  const playPrevRef = useRef<() => void>(() => undefined);
+  const stopRef = useRef<() => void>(() => undefined);
+  const lastNotificationSyncRef = useRef(0);
 
   const [currentEpisode, setCurrentEpisode] = useState<Episode | null>(null);
   const [currentPodcast, setCurrentPodcast] = useState<Podcast | null>(null);
@@ -170,31 +193,63 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     audio.preload = 'auto';
     audio.volume = 1;
 
+    const pushNotification = (playing: boolean) => {
+      if (!isMediaNotificationSupported()) return;
+      const episode = currentEpisodeRef.current;
+      if (!episode) return;
+      const podcast = currentPodcastRef.current;
+      const track: MediaTrack = {
+        title: episode.title,
+        artist: notificationArtist(episode, podcast),
+        artwork: episode.podcast?.cover_url || podcast?.cover_url || '',
+        duration: Math.floor((audio.duration || 0) * 1000),
+        position: Math.floor(audio.currentTime * 1000),
+        playing,
+      };
+      syncMediaNotification(track);
+    };
+
     const onTimeUpdate = () => {
       progressRef.current = audio.currentTime;
       // The UI does not need 4 React renders per second. Throttling this keeps
       // the whole page responsive while the audio keeps playing smoothly.
       const now = Date.now();
+      if (now - lastNotificationSyncRef.current > 5000) {
+        lastNotificationSyncRef.current = now;
+        pushNotification(!audio.paused);
+      }
       if (now - lastTimeRenderRef.current < 500) return;
       lastTimeRenderRef.current = now;
       setCurrentTime(audio.currentTime);
     };
-    const onDurationChange = () => setDuration(audio.duration || 0);
-    const onPlay = () => setIsPlaying(true);
+    const onDurationChange = () => {
+      setDuration(audio.duration || 0);
+      pushNotification(!audio.paused);
+    };
+    const onPlay = () => {
+      setIsPlaying(true);
+      pushNotification(true);
+    };
     const onPlaying = () => {
       setIsPlaying(true);
       setIsBuffering(false);
+      pushNotification(true);
     };
     const onWaiting = () => setIsBuffering(true);
     const onPause = () => {
       setIsPlaying(false);
       setIsBuffering(false);
+      pushNotification(false);
     };
     const onEnded = () => handleEnded();
-    const onLoadedMetadata = () => setDuration(audio.duration || 0);
+    const onLoadedMetadata = () => {
+      setDuration(audio.duration || 0);
+      pushNotification(!audio.paused);
+    };
     const onError = () => {
       setIsPlaying(false);
       setIsBuffering(false);
+      pushNotification(false);
     };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
@@ -221,6 +276,29 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => { currentEpisodeRef.current = currentEpisode; }, [currentEpisode]);
+  useEffect(() => { currentPodcastRef.current = currentPodcast; }, [currentPodcast]);
+
+  // Start/replace the Android media notification whenever the track changes.
+  useEffect(() => {
+    if (!isMediaNotificationSupported()) return;
+    if (!currentEpisode) {
+      stopMediaNotification();
+      return;
+    }
+    startMediaNotification({
+      title: currentEpisode.title,
+      artist: notificationArtist(currentEpisode, currentPodcast),
+      artwork: currentEpisode.podcast?.cover_url || currentPodcast?.cover_url || '',
+      duration: Math.floor(duration * 1000),
+      position: Math.floor(currentTime * 1000),
+      playing: isPlaying,
+    });
+    // Position/playing are synchronised separately from audio events; only a
+    // new episode or podcast needs to restart the notification.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentEpisode, currentPodcast]);
 
   // Apply playback rate
   useEffect(() => {
@@ -280,6 +358,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       const nextIdx = queueIndex + 1;
       setQueueIndex(nextIdx);
       const nextEp = queue[nextIdx];
+      currentEpisodeRef.current = nextEp;
+      if (nextEp.podcast) currentPodcastRef.current = nextEp.podcast;
       setCurrentEpisode(nextEp);
       if (audioRef.current) {
         const audio = audioRef.current;
@@ -296,6 +376,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       }
     } else if (repeatMode === 'all' && queue.length > 0) {
       setQueueIndex(0);
+      currentEpisodeRef.current = queue[0];
+      if (queue[0].podcast) currentPodcastRef.current = queue[0].podcast;
       setCurrentEpisode(queue[0]);
       if (audioRef.current) {
         const audio = audioRef.current;
@@ -313,6 +395,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     } else {
       playTokenRef.current += 1;
       setIsPlaying(false);
+      stopMediaNotification();
     }
   }, [currentEpisode, duration, queue, queueIndex, repeatMode, saveProgress]);
 
@@ -342,6 +425,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      currentEpisodeRef.current = episode;
+      if (podcast) currentPodcastRef.current = podcast;
       setCurrentEpisode(episode);
       if (podcast) setCurrentPodcast(podcast);
 
@@ -427,6 +512,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     const nextIdx = queueIndex + 1 < queue.length ? queueIndex + 1 : 0;
     setQueueIndex(nextIdx);
     const nextEp = queue[nextIdx];
+    currentEpisodeRef.current = nextEp;
+    if (nextEp.podcast) currentPodcastRef.current = nextEp.podcast;
     setCurrentEpisode(nextEp);
     if (audioRef.current) {
       const audio = audioRef.current;
@@ -449,6 +536,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     const prevIdx = queueIndex - 1 >= 0 ? queueIndex - 1 : queue.length - 1;
     setQueueIndex(prevIdx);
     const prevEp = queue[prevIdx];
+    currentEpisodeRef.current = prevEp;
+    if (prevEp.podcast) currentPodcastRef.current = prevEp.podcast;
     setCurrentEpisode(prevEp);
     if (audioRef.current) {
       const audio = audioRef.current;
@@ -472,11 +561,58 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       audioRef.current.pause();
       audioRef.current.src = '';
     }
+    currentEpisodeRef.current = null;
+    currentPodcastRef.current = null;
+    stopMediaNotification();
     setCurrentEpisode(null);
     setCurrentPodcast(null);
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
+  }, []);
+
+  // Keep stable refs for notification actions so the listener never captures
+  // stale closures when the queue changes.
+  useEffect(() => { playNextRef.current = playNext; }, [playNext]);
+  useEffect(() => { playPrevRef.current = playPrev; }, [playPrev]);
+  useEffect(() => { stopRef.current = stop; }, [stop]);
+
+  useEffect(() => {
+    if (!isMediaNotificationSupported()) return undefined;
+    let handle: { remove: () => void } | null = null;
+    void listenMediaNotificationActions(({ action, value }) => {
+      const audio = audioRef.current;
+      if (!audio) return;
+      switch (action) {
+        case 'play':
+          if (!currentEpisodeRef.current) return;
+          setIsBuffering(true);
+          void audio.play().catch(() => setIsPlaying(false));
+          break;
+        case 'pause':
+          audio.pause();
+          break;
+        case 'next':
+          playNextRef.current();
+          break;
+        case 'prev':
+          playPrevRef.current();
+          break;
+        case 'seek':
+          try {
+            audio.currentTime = Math.max(0, Math.min(audio.duration || 0, value));
+          } catch {
+            // Source changed between the tap and the seek.
+          }
+          break;
+        case 'stop':
+          stopRef.current();
+          break;
+        default:
+          break;
+      }
+    }).then((listener) => { handle = listener; }).catch(() => undefined);
+    return () => { handle?.remove(); };
   }, []);
 
   // Save progress on unmount/page hide

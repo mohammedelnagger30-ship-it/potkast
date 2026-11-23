@@ -139,6 +139,44 @@
   .glass-effect {
     @apply backdrop-blur-lg bg-white/80 dark:bg-neutral-900/80;
   }
+
+  /* Same visual language as the inline boot shell, used by React loading states. */
+  .app-loading-wave {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 28px;
+  }
+
+  .app-loading-wave > span {
+    display: block;
+    width: 4px;
+    border-radius: 999px;
+    background: rgb(var(--primary-600) / 1);
+    animation: app-loading-wave 900ms ease-in-out infinite alternate;
+  }
+
+  .app-loading-wave > span:nth-child(2) { height: 20px; }
+  .app-loading-wave > span:nth-child(3) { height: 27px; }
+  .app-loading-wave > span:nth-child(4) { height: 17px; }
+  .app-loading-wave > span:nth-child(5) {
+    height: 10px;
+    background: rgb(var(--accent-500) / 1);
+  }
+
+  .app-loading-wave > span:nth-child(1) { height: 12px; }
+}
+
+@keyframes app-loading-wave {
+  from { transform: scaleY(0.45); opacity: 0.55; }
+  to { transform: scaleY(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-loading-wave > span {
+    animation: none;
+  }
 }
 
 @layer utilities {
