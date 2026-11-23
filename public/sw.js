@@ -1,5 +1,5 @@
 // Service Worker: offline app shell + push notifications.
-const VERSION = 'nammy-v4';
+const VERSION = 'nammy-v5';
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 // Audio cache is intentionally unversioned: app updates must not delete files
