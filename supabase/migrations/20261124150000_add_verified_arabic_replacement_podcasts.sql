@@ -1,6 +1,6 @@
 /*
   Add verified Arabic-famous replacement podcasts after clear-English removal.
-  Sources: verified public RSS feeds with real audio enclosures (checked 200/206 audio/*).
+  Sources: verified public RSS feeds with real audio enclosures (checked 200/206 audio).
   Scope: relationships/culture, science, sports, professional/career/money, technology, psychology, religious speech.
   Notes:
   - No ibtihalat/music-only content; religious entries are speech/lecture style.
