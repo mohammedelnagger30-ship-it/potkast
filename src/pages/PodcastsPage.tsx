@@ -12,10 +12,16 @@ import { supabase } from '@/lib/supabase';
 import { readCatalogCache, writeCatalogCache } from '@/lib/catalogCache';
 import { matchesAnyArabicSearch } from '@/lib/arabicSearch';
 import type { Podcast, Category, Episode, ListeningHistory } from '@/types/podcast';
-import { typeLabels, levelLabels, interestToCategoryMap } from '@/types/podcast';
+import { typeLabels, interestToCategoryMap } from '@/types/podcast';
+import {
+  PODCAST_LEVELS,
+  normalizePodcastLevel,
+  podcastLevelLabel,
+  type PodcastLevel,
+} from '@/lib/podcastLevels';
 
 type FilterType = 'all' | 'religious' | 'scientific' | 'cultural' | 'motivational' | 'professional' | 'comedy' | 'leadership' | 'communication' | 'improv';
-type FilterLevel = 'all' | 'beginner' | 'intermediate' | 'expert';
+type FilterLevel = 'all' | PodcastLevel;
 type CategoryWithCount = Category & { podcast_count?: number };
 
 const PAGE_SIZE = 24;
@@ -193,26 +199,59 @@ export default function PodcastsPage() {
     );
   }, [categories]);
 
-  // Filtered podcasts for search/grid view
-  const filteredPodcasts = allPodcasts.filter((p) => {
-    if (
-      searchQuery &&
-      !matchesAnyArabicSearch(
-        searchQuery,
-        p.title,
-        p.host_name,
-        p.host?.name_ar,
-        p.description,
-        p.category?.name_ar,
-      )
-    ) return false;
-    // The categories table contains several rows with the same Arabic name,
-    // so filter by the joined name, not by one specific duplicate id.
-    if (selectedCategory !== 'all' && p.category?.name_ar !== selectedCategory) return false;
-    if (filterType !== 'all' && p.type !== filterType) return false;
-    if (filterLevel !== 'all' && p.audience_level !== filterLevel) return false;
-    return true;
-  });
+  // Everything except the level filter. The level chips are built from this
+  // set, so they only offer levels that actually exist for the current search,
+  // category and type — with the number of podcasts each one will show.
+  const podcastsBeforeLevelFilter = useMemo(
+    () =>
+      allPodcasts.filter((p) => {
+        if (
+          searchQuery &&
+          !matchesAnyArabicSearch(
+            searchQuery,
+            p.title,
+            p.host_name,
+            p.host?.name_ar,
+            p.description,
+            p.category?.name_ar,
+          )
+        ) return false;
+        // The categories table contains several rows with the same Arabic name,
+        // so filter by the joined name, not by one specific duplicate id.
+        if (selectedCategory !== 'all' && p.category?.name_ar !== selectedCategory) return false;
+        if (filterType !== 'all' && p.type !== filterType) return false;
+        return true;
+      }),
+    [allPodcasts, searchQuery, selectedCategory, filterType]
+  );
+
+  const levelOptions = useMemo(() => {
+    const counts = new Map<PodcastLevel, number>();
+    podcastsBeforeLevelFilter.forEach((p) => {
+      const level = normalizePodcastLevel(p.audience_level);
+      if (level) counts.set(level, (counts.get(level) || 0) + 1);
+    });
+    return [
+      { value: 'all' as FilterLevel, label: 'الكل', count: podcastsBeforeLevelFilter.length },
+      ...PODCAST_LEVELS.filter((level) => counts.has(level)).map((level) => ({
+        value: level as FilterLevel,
+        label: podcastLevelLabel(level),
+        count: counts.get(level) || 0,
+      })),
+    ];
+  }, [podcastsBeforeLevelFilter]);
+
+  // If a new search/category leaves no podcasts at the chosen level, fall back
+  // to "all" instead of leaving the user staring at an impossible filter.
+  useEffect(() => {
+    if (filterLevel !== 'all' && !levelOptions.some((option) => option.value === filterLevel)) {
+      setFilterLevel('all');
+    }
+  }, [filterLevel, levelOptions]);
+
+  const filteredPodcasts = podcastsBeforeLevelFilter.filter(
+    (p) => filterLevel === 'all' || normalizePodcastLevel(p.audience_level) === filterLevel
+  );
 
   // Recommended: match user interests to category names
   const recommended = profile?.interests && profile.interests.length > 0
@@ -350,19 +389,25 @@ export default function PodcastsPage() {
               </div>
             </div>
             <div>
-              <p className="text-sm font-bold text-neutral-700 dark:text-neutral-300 mb-2">المستوى</p>
+              <p className="text-sm font-bold text-neutral-700 dark:text-neutral-300 mb-2">
+                المستوى <span className="text-xs font-normal text-neutral-400">(حسب البودكاستات المتاحة)</span>
+              </p>
               <div className="flex flex-wrap gap-2">
-                {(['all', 'beginner', 'intermediate', 'expert'] as FilterLevel[]).map((l) => (
+                {levelOptions.map((option) => (
                   <button
-                    key={l}
-                    onClick={() => setFilterLevel(l)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                      filterLevel === l
+                    key={option.value}
+                    onClick={() => setFilterLevel(option.value)}
+                    title={`${option.count} بودكاست بمستوى ${option.label}`}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                      filterLevel === option.value
                         ? 'bg-primary-600 text-white'
-                        : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+                        : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
                     }`}
                   >
-                    {l === 'all' ? 'الكل' : levelLabels[l]}
+                    <span>{option.label}</span>
+                    <span className={`text-[10px] font-bold ${filterLevel === option.value ? 'text-white/75' : 'text-neutral-400'}`}>
+                      {option.count.toLocaleString('ar-EG')}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -388,13 +433,30 @@ export default function PodcastsPage() {
         <div>
           <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">
             {filteredPodcasts.length} نتيجة
+            {filterLevel !== 'all' && (
+              <span className="font-bold text-primary-600 dark:text-primary-400">
+                {' · '}المستوى: {podcastLevelLabel(filterLevel)}
+              </span>
+            )}
           </p>
           {filteredPodcasts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <div className="w-16 h-16 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-400 mb-3">
                 <Search size={28} />
               </div>
-              <p className="text-neutral-500 dark:text-neutral-400 font-semibold">لا توجد نتائج مطابقة</p>
+              <p className="text-neutral-500 dark:text-neutral-400 font-semibold">
+                {filterLevel !== 'all'
+                  ? `لا توجد بودكاستات بمستوى ${podcastLevelLabel(filterLevel)} مع الفلاتر الحالية`
+                  : 'لا توجد نتائج مطابقة'}
+              </p>
+              {filterLevel !== 'all' && (
+                <button
+                  onClick={() => setFilterLevel('all')}
+                  className="mt-2 text-sm font-bold text-primary-600 dark:text-primary-400 hover:underline"
+                >
+                  عرض كل المستويات
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">

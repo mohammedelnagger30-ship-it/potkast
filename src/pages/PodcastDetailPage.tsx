@@ -28,11 +28,11 @@ import { hostPhotoUrl } from '@/lib/hostPhotos';
 import { podcastCoverUrl } from '@/lib/podcastArtwork';
 import { byLatest, byOldest, byPlays, bySeries } from '@/lib/episodeOrder';
 import { supabase } from '@/lib/supabase';
+import { podcastLevelLabel } from '@/lib/podcastLevels';
 import type { Podcast, Episode, ListeningHistory } from '@/types/podcast';
 import type { EpisodeBookmark, EpisodeNote } from '@/types/features';
 import {
   typeLabels,
-  levelLabels,
   formatDuration,
   formatRelativeTime,
   formatCount,
@@ -380,7 +380,7 @@ export default function PodcastDetailPage() {
             <div className="flex-1 pt-1 sm:pt-2">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <Badge variant="primary" size="sm">{typeLabels[podcast.type]}</Badge>
-                <Badge variant="neutral" size="sm">{levelLabels[podcast.audience_level]}</Badge>
+                <Badge variant="neutral" size="sm">{podcastLevelLabel(podcast.audience_level)}</Badge>
                 {podcast.category && (
                   <Badge variant="accent" size="sm">{podcast.category.name_ar}</Badge>
                 )}

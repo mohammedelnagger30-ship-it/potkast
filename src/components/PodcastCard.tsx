@@ -8,7 +8,8 @@ import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { Badge } from '@/components/ui';
 import { OptimizedImage } from '@/components/OptimizedImage';
 import { podcastCoverUrl } from '@/lib/podcastArtwork';
-import { typeLabels, levelLabels } from '@/types/podcast';
+import { podcastLevelLabel } from '@/lib/podcastLevels';
+import { typeLabels } from '@/types/podcast';
 
 interface PodcastCardProps {
   podcast: Podcast;
@@ -218,7 +219,7 @@ export function PodcastCard({ podcast, onToggleFavorite, compact = false, episod
       </div>
       <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
         <Badge variant="primary" size="sm">{typeLabels[podcast.type] || podcast.type}</Badge>
-        <Badge variant="neutral" size="sm">{levelLabels[podcast.audience_level] || podcast.audience_level}</Badge>
+        <Badge variant="neutral" size="sm">{podcastLevelLabel(podcast.audience_level)}</Badge>
       </div>
       <h3 className="font-bold text-neutral-900 dark:text-white truncate">{podcast.title}</h3>
       {hostLink ? (
