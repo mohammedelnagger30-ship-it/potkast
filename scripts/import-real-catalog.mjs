@@ -77,15 +77,6 @@ const HOSTS = [
     type: 'scientific',
   },
   {
-    artist: 'Mustafa Hosny',
-    name_ar: 'مصطفى حسني',
-    slug: 'mustafa-hosny',
-    title_ar: 'الداعية',
-    specialty_ar: 'دين وتزكية',
-    country: 'مصر',
-    type: 'religious',
-  },
-  {
     artist: 'أمجد سمير',
     name_ar: 'أمجد سمير',
     slug: 'amgad-samir',

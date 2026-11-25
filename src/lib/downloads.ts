@@ -207,6 +207,38 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1024 ** i).toFixed(i ? 1 : 0)} ${units[i]}`;
 }
 
+export function downloadLocationLabel(record: DownloadRecord): string {
+  if (record.storage === 'native') return 'ملف محفوظ على جهازك (إدارة ملفات/التنزيلات حسب النظام)';
+  return 'محفوظ داخل التطبيق في المتصفح لهذا الجهاز (بدون إنترنت)';
+}
+
+export async function saveDownloadedFile(record: DownloadRecord): Promise<'saved' | 'unsupported'> {
+  if (record.storage === 'native' && record.nativeUri) {
+    // Native files are already on device; caller can show location.
+    return 'unsupported';
+  }
+  const db = await getDb();
+  const file = await db.get('files', record.id);
+  let blob = file?.blob;
+  if (!blob && record.storage === 'cache' && 'caches' in window) {
+    const cache = await window.caches.open(SW_CACHE);
+    const response = await cache.match(swCacheKey(record.audioUrl));
+    if (response) blob = await response.blob();
+  }
+  if (!blob) return 'unsupported';
+  const ext = (blob.type || record.mime || 'audio/mpeg').includes('mpeg') ? 'mp3' : (blob.type.split('/')[1] || 'audio');
+  const safe = (record.episodeTitle || 'episode').replace(/[\/:*?"<>|]+/g, '-').slice(0, 80);
+  const a = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  a.href = url;
+  a.download = `${safe}.${ext}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return 'saved';
+}
+
 const RANGE_CHUNK = 4 * 1024 * 1024;
 const RANGE_WORKERS = 5;
 const RANGE_UNSUPPORTED = 'RANGE_UNSUPPORTED';

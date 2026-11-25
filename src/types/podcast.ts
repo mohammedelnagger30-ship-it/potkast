@@ -62,6 +62,7 @@ export interface Episode {
   duration_seconds: number;
   plays_count: number;
   published_at: string;
+  image_url?: string;
   podcast?: Podcast;
 }
 

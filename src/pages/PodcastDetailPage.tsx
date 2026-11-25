@@ -324,13 +324,20 @@ export default function PodcastDetailPage() {
           <div className="flex flex-col sm:flex-row gap-4">
             {/* Cover */}
             <div className="flex-shrink-0">
-              {podcast.cover_url && (
-                <img
-                  src={podcast.cover_url}
-                  alt={podcast.title}
-                  className="w-28 h-28 lg:w-32 lg:h-32 rounded-2xl object-cover shadow-lg border-4 border-white dark:border-neutral-900"
-                />
-              )}
+              {(() => {
+                const cover = podcast.cover_url || podcast.host?.photo_url || '';
+                return cover ? (
+                  <img
+                    src={cover}
+                    alt={podcast.title}
+                    className="w-28 h-28 lg:w-32 lg:h-32 rounded-2xl object-cover shadow-lg border-4 border-white dark:border-neutral-900"
+                  />
+                ) : (
+                  <div className="w-28 h-28 lg:w-32 lg:h-32 rounded-2xl bg-gradient-to-br from-primary-700 to-primary-900 flex items-center justify-center text-white text-4xl font-extrabold shadow-lg border-4 border-white dark:border-neutral-900">
+                    {podcast.title.charAt(0)}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Info */}
@@ -495,25 +502,29 @@ export default function PodcastDetailPage() {
               {isCurrent && <span className="absolute right-0 top-0 h-full w-1 bg-primary-500" />}
 
               <div className="flex items-center gap-3.5 p-3.5 sm:p-4">
-                {/* Play + episode number */}
-                <div className="relative flex-shrink-0">
+                {/* Episode image */}
+                <div className="relative flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-neutral-200 dark:bg-neutral-800">
+                  {(() => {
+                    const thumb = ep.image_url || podcast.cover_url || podcast.host?.photo_url || '';
+                    return thumb ? (
+                      <img src={thumb} alt={ep.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-primary-700 to-primary-900 flex items-center justify-center text-white text-lg font-extrabold">
+                        {ep.title.charAt(0)}
+                      </div>
+                    );
+                  })()}
                   <button
                     onClick={() => handlePlayEpisode(ep)}
                     disabled={!ep.audio_url}
                     aria-label={isCurrent && isPlaying ? 'إيقاف مؤقت' : 'تشغيل الحلقة'}
-                    className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all active:scale-90 disabled:cursor-not-allowed disabled:opacity-40 ${
-                      isCurrent
-                        ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/25'
-                        : 'bg-primary-50 text-primary-600 group-hover:bg-primary-600 group-hover:text-white dark:bg-primary-900/30 dark:text-primary-400'
-                    }`}
+                    className={`absolute inset-0 flex items-center justify-center transition-all disabled:cursor-not-allowed ${isCurrent ? 'bg-black/35' : 'bg-black/0 hover:bg-black/25'}`}
                   >
-                    {isCurrent && isPlaying ? (
-                      <Pause size={20} fill="currentColor" />
-                    ) : (
-                      <Play size={20} fill="currentColor" className="mr-0.5" />
-                    )}
+                    <span className={`flex h-8 w-8 items-center justify-center rounded-full transition-all ${isCurrent ? 'bg-primary-600 text-white shadow-lg' : 'bg-white/90 text-primary-700 opacity-90 group-hover:opacity-100'}`}>
+                      {isCurrent && isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="mr-0.5" />}
+                    </span>
                   </button>
-                  <span className="absolute -left-1.5 -top-1.5 flex min-w-[20px] items-center justify-center rounded-full border border-neutral-200 bg-white px-1 text-[10px] font-extrabold text-neutral-500 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
+                  <span className="absolute -left-1 -top-1 flex min-w-[20px] items-center justify-center rounded-full border border-neutral-200 bg-white px-1 text-[10px] font-extrabold text-neutral-500 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
                     {idx + 1}
                   </span>
                 </div>

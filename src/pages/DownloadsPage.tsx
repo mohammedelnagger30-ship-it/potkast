@@ -2,14 +2,15 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Clock, Download, HardDrive,
-  Headphones, Loader2, Play, RotateCcw, Search, Trash2, TriangleAlert, WifiOff,
+  Headphones, Info, Loader2, Play, RotateCcw, Search, Trash2, TriangleAlert, WifiOff,
 } from 'lucide-react';
+import { matchesAnyArabicSearch } from '@/lib/arabicSearch';
 import { Layout } from '@/components/layout';
 import { Card, ProgressBar } from '@/components/ui';
 import { useDownload } from '@/context/DownloadContext';
 import { useProgress } from '@/context/ProgressContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
-import { formatBytes } from '@/lib/downloads';
+import { formatBytes, saveDownloadedFile, downloadLocationLabel } from '@/lib/downloads';
 import { formatDuration } from '@/types/podcast';
 import type { DownloadRecord } from '@/lib/downloads';
 import type { Podcast } from '@/types/podcast';
@@ -67,11 +68,8 @@ export default function DownloadsPage() {
   const storagePct = storage.quota > 0 ? Math.min(100, (storage.usage / storage.quota) * 100) : 0;
 
   const groups = useMemo(() => {
-    const q = query.trim().toLowerCase();
     const rows = finished
-      .filter((row) => !q
-        || row.episodeTitle.toLowerCase().includes(q)
-        || row.podcastTitle.toLowerCase().includes(q))
+      .filter((row) => !query.trim() || matchesAnyArabicSearch(query, row.episodeTitle, row.podcastTitle))
       .sort((a, b) => b.createdAt - a.createdAt);
 
     const map = new Map<string, DownloadRecord[]>();
@@ -138,6 +136,12 @@ export default function DownloadsPage() {
         </div>
       </div>
 
+      {saveNotice && (
+        <div className="mb-4 rounded-2xl border border-primary-200 dark:border-primary-900/40 bg-primary-50 dark:bg-primary-900/10 p-3 text-sm text-primary-800 dark:text-primary-200 flex items-start gap-2">
+          <Info size={16} className="mt-0.5 flex-shrink-0" />
+          <span>{saveNotice}</span>
+        </div>
+      )}
       <Card>
         <div className="flex gap-1 p-1 mb-5 rounded-xl bg-neutral-100 dark:bg-neutral-800">
           {tabs.map(({ id, label, count, icon: Icon }) => (
@@ -174,7 +178,7 @@ export default function DownloadsPage() {
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="ابحث في المحفوظات أو اسم البودكاست"
+                    placeholder="ابحث في المحفوظات أو اسم البودكاست (بدون همزات/تشكيل)"
                     className="w-full pr-9 pl-3 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 text-sm text-neutral-800 dark:text-neutral-100 outline-none focus:border-primary-500"
                   />
                 </div>
@@ -253,13 +257,32 @@ export default function DownloadsPage() {
                               </button>
                               <div className="min-w-0 flex-1">
                                 <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200 truncate">{row.episodeTitle}</p>
-                                <p className="text-[11px] text-neutral-500 flex items-center gap-1.5 mt-0.5">
+                                <p className="text-[11px] text-neutral-500 flex items-center gap-1.5 mt-0.5 flex-wrap">
                                   <CheckCircle2 size={11} className="text-success-500" />
                                   محفوظة على جهازك
                                   {row.durationSeconds > 0 && <>• {formatDuration(row.durationSeconds)}</>}
                                   {row.size > 0 && <>• {formatBytes(row.size)}</>}
+                                  <>• {row.storage === 'native' ? 'ملف على الجهاز' : 'داخل التطبيق (بدون إنترنت)'}</>
+                                </p>
+                                <p className="text-[10px] text-neutral-400 mt-0.5 truncate" title={downloadLocationLabel(row)}>
+                                  مكان الحفظ: {downloadLocationLabel(row)}
                                 </p>
                               </div>
+                              {row.storage !== 'native' && (
+                                <button
+                                  onClick={async () => {
+                                    const res = await saveDownloadedFile(row);
+                                    if (res === 'saved') {
+                                      setSaveNotice('تم بدء حفظ الملف. على الكمبيوتر عادة تجده في مجلد التنزيلات الافتراضي للمتصفح؛ ويمكنك معرفة/تغيير مكان الحفظ من إعدادات التنزيلات في المتصفح.');
+                                      window.setTimeout(() => setSaveNotice(null), 7000);
+                                    }
+                                  }}
+                                  title="حفظ الملف على الكمبيوتر/الجهاز"
+                                  className="p-2 rounded-lg text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 flex-shrink-0"
+                                >
+                                  <Download size={16} />
+                                </button>
+                              )}
                               <button
                                 onClick={() => void remove(row.id)}
                                 title="حذف هذا التنزيل"
@@ -311,9 +334,10 @@ export default function DownloadsPage() {
                       </button>
                     </div>
                     <ProgressBar value={pct} size="sm" />
-                    {row.size > 0 && (
-                      <p className="text-[11px] text-neutral-500 mt-1.5">تم تنزيل {formatBytes(row.size)}</p>
-                    )}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-neutral-500 mt-1.5">
+                      <span>{row.status === 'queued' ? 'في انتظار بدء التنزيل' : `تم تنزيل ${row.size > 0 ? formatBytes(row.size) : '...'}`}</span>
+                      <span>{row.storage === 'native' ? 'سيُحفظ كملف على الجهاز' : 'سيُحفظ داخل التطبيق للتشغيل بدون إنترنت'}</span>
+                    </div>
                   </div>
                 );
               })}
@@ -366,6 +390,10 @@ export default function DownloadsPage() {
           <p className="text-xs text-neutral-500 mt-2">
             {formatBytes(storage.usage)} مستخدمة. الملفات بتتخزن على جهازك فقط، ومش بتترفع لأي سيرفر.
           </p>
+          <div className="mt-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/60 p-3 text-[11px] text-neutral-600 dark:text-neutral-400 space-y-1">
+            <p><span className="font-bold text-neutral-700 dark:text-neutral-300">مكان الحفظ:</span> على الموبايل/التطبيق يتم الحفظ داخل مساحة التطبيق أو ملف الجهاز حسب المنصة.</p>
+            <p><span className="font-bold text-neutral-700 dark:text-neutral-300">على الكمبيوتر (المتصفح):</span> التحميل المباشر للملف يتم عبر المتصفح في مجلد التنزيلات الافتراضي، ويمكنك معرفة/تغيير المكان من إعدادات التنزيلات في المتصفح.</p>
+          </div>
         </Card>
 
         <Card>

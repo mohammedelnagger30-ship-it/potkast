@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { supabase } from '@/lib/supabase';
 import { readCatalogCache, writeCatalogCache } from '@/lib/catalogCache';
+import { matchesAnyArabicSearch } from '@/lib/arabicSearch';
 import type { Podcast, Category, Episode, ListeningHistory } from '@/types/podcast';
 import { typeLabels, levelLabels, interestToCategoryMap } from '@/types/podcast';
 
@@ -49,7 +50,7 @@ export default function PodcastsPage() {
       // made the list slower to open without being displayed anywhere.
       supabase
         .from('podcasts')
-        .select('id,title,cover_url,type,audience_level,host_name,created_at,category_id,host_id,category:categories(name_ar),host:hosts(id,name_ar,slug,is_verified)')
+        .select('id,title,cover_url,type,audience_level,host_name,created_at,category_id,host_id,category:categories(name_ar),host:hosts(id,name_ar,slug,is_verified,photo_url)')
         .order('created_at', { ascending: false }),
       supabase.from('categories').select('*').order('name_ar'),
       user ? supabase.from('favorites').select('podcast_id').eq('user_id', user.id) : Promise.resolve({ data: null }),
@@ -141,7 +142,17 @@ export default function PodcastsPage() {
 
   // Filtered podcasts for search/grid view
   const filteredPodcasts = allPodcasts.filter((p) => {
-    if (searchQuery && !p.title.includes(searchQuery) && !p.host_name.includes(searchQuery)) return false;
+    if (
+      searchQuery &&
+      !matchesAnyArabicSearch(
+        searchQuery,
+        p.title,
+        p.host_name,
+        p.host?.name_ar,
+        p.description,
+        p.category?.name_ar,
+      )
+    ) return false;
     // The categories table contains several rows with the same Arabic name,
     // so filter by the joined name, not by one specific duplicate id.
     if (selectedCategory !== 'all' && p.category?.name_ar !== selectedCategory) return false;
@@ -204,7 +215,7 @@ export default function PodcastsPage() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="ابحث عن بودكاست أو مقدم..."
+          placeholder="ابحث عن بودكاست أو مقدم... (يدعم البحث بدون همزات/تشكيل)"
           className="w-full pr-11 pl-11 py-3 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
         />
         {searchQuery && (

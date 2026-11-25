@@ -3,6 +3,7 @@ import { Search, X, ArrowUpDown } from 'lucide-react';
 import { Layout } from '@/components/layout';
 import { HostCard } from '@/components/HostCard';
 import { supabase } from '@/lib/supabase';
+import { matchesAnyArabicSearch } from '@/lib/arabicSearch';
 import type { Host } from '@/types/podcast';
 
 type SortOption = 'fame' | 'followers' | 'popular' | 'newest' | 'az';
@@ -58,7 +59,10 @@ export default function HostsPage() {
 
   const filtered = hosts
     .filter((h) => {
-      if (searchQuery && !h.name_ar.includes(searchQuery) && !h.specialty_ar.includes(searchQuery)) return false;
+      if (
+        searchQuery &&
+        !matchesAnyArabicSearch(searchQuery, h.name_ar, h.specialty_ar, h.title_ar, h.bio_ar, h.country)
+      ) return false;
       if (selectedCategory !== 'all' && h.category?.name_ar !== selectedCategory) return false;
       return true;
     })
@@ -107,7 +111,7 @@ export default function HostsPage() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="ابحث عن مقدم أو تخصص..."
+          placeholder="ابحث عن مقدم أو تخصص... (يدعم البحث بدون همزات/تشكيل)"
           className="w-full pr-11 pl-11 py-3 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
         />
         {searchQuery && (

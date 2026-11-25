@@ -764,62 +764,6 @@
     ]
   },
   {
-    "name_ar": "مصطفى حسني",
-    "slug": "mustafa-hosny",
-    "shows": [
-      {
-        "title": "Mustafa Hosny - مصطفى حسني",
-        "type": "religious",
-        "episodes": 500
-      },
-      {
-        "title": "Selselet Altareeq - Mustafa Hosny - سلسلة الطريق - مصطفى حسني",
-        "type": "religious",
-        "episodes": 95
-      },
-      {
-        "title": "Asweyaa - Mustafa Hosny - أسوياء - قصص حياة الصحابة - مصطفى حسني",
-        "type": "religious",
-        "episodes": 87
-      },
-      {
-        "title": "Noor - ElSira ElNabwyah - Mustafa Hosny - نور - السيرة النبوية - مصطفى حسني",
-        "type": "religious",
-        "episodes": 40
-      },
-      {
-        "title": "Baseer - Mustafa Hosny - بصير - مصطفى حسني",
-        "type": "religious",
-        "episodes": 30
-      },
-      {
-        "title": "ElHesn - Mustafa Hosny - الحصن - مصطفى حسني",
-        "type": "religious",
-        "episodes": 30
-      },
-      {
-        "title": "Nefoos - Mustafa Hosny - نفوس - مصطفى حسني",
-        "type": "religious",
-        "episodes": 30
-      },
-      {
-        "title": "Khaterat AlFjr - Ramadan 2025 - خاطرة الفجر - رمضان 2025",
-        "type": "religious",
-        "episodes": 30
-      },
-      {
-        "title": "Khaterat AlFjr - Ramadan 2026 - خاطرة الفجر - رمضان 2026",
-        "type": "religious",
-        "episodes": 30
-      },
-      {
-        "title": "Takbirat El-Eid - تكبيرات العيد",
-        "type": "religious",
-        "episodes": 1
-      }
-    ]
-  },
-  {
     "name_ar": "أمجد سمير",
     "slug": "amgad-samir",
     "shows": [

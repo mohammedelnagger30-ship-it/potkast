@@ -10,16 +10,16 @@ export const navItems: NavItem[] = [
   { label: 'الرئيسية', path: '/', icon: Home },
   { label: 'البودكاست', path: '/podcasts', icon: Mic },
   { label: 'المقدمون', path: '/hosts', icon: Users },
-  { label: 'المفضلة', path: '/favorites', icon: Heart },
   { label: 'المهام', path: '/missions', icon: Target },
   { label: 'تقدّمي', path: '/progress', icon: TrendingUp },
   { label: 'التنزيلات', path: '/downloads', icon: Download },
+  { label: 'المفضلة', path: '/favorites', icon: Heart },
   { label: 'الإشعارات', path: '/notifications', icon: Bell },
   { label: 'الملف الشخصي', path: '/profile', icon: User },
   { label: 'الإعدادات', path: '/settings', icon: Settings2 },
 ];
 
 // Bottom nav fits ~5 items on small screens; the full list lives in the sidebar
-const mobilePaths = new Set(['/', '/podcasts', '/favorites', '/missions', '/progress']);
+const mobilePaths = new Set(['/', '/podcasts', '/hosts', '/missions', '/progress']);
 
 export const mobileNavItems: NavItem[] = navItems.filter((i) => mobilePaths.has(i.path));

@@ -17,6 +17,7 @@ import { interestLabels, interestOptions } from '@/lib/interests';
 
 const shortcuts = [
   { icon: Download, label: 'التنزيلات والتقدّم', to: '/downloads' },
+  { icon: Heart, label: 'المفضلة', to: '/favorites' },
   { icon: Award, label: 'إنجازاتي وأوسمتي', to: '/achievements' },
   { icon: BookHeart, label: 'مذكراتي اليومية', to: '/journal' },
   { icon: CircleDot, label: 'عجلة الحياة', to: '/life-wheel' },

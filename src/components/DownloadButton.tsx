@@ -9,13 +9,28 @@ const RING_LENGTH = 2 * Math.PI * 9;
 function ProgressRing({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(100, Math.round(value * 100)));
   return (
-    <span className="relative inline-flex items-center justify-center flex-shrink-0">
-      <svg width="22" height="22" viewBox="0 0 24 24" className="-rotate-90" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" fill="none" strokeWidth="2.5"
-          className="text-neutral-200 dark:text-neutral-700" stroke="currentColor" />
-        <circle cx="12" cy="12" r="9" fill="none" strokeWidth="2.5" strokeLinecap="round"
-          className="text-primary-600 dark:text-primary-400" stroke="currentColor"
-          strokeDasharray={`${(pct / 100) * RING_LENGTH} ${RING_LENGTH}`} />
+    <span className="relative inline-flex items-center justify-center flex-shrink-0" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" className="-rotate-90">
+        <circle
+          cx="12"
+          cy="12"
+          r="9"
+          fill="none"
+          strokeWidth="2.5"
+          className="text-neutral-200 dark:text-neutral-700"
+          stroke="currentColor"
+        />
+        <circle
+          cx="12"
+          cy="12"
+          r="9"
+          fill="none"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          className="text-primary-600 dark:text-primary-400"
+          stroke="currentColor"
+          strokeDasharray={`${(pct / 100) * RING_LENGTH} ${RING_LENGTH}`}
+        />
       </svg>
       <span className="absolute text-[8px] font-extrabold text-primary-700 dark:text-primary-300">
         {pct}
@@ -43,7 +58,7 @@ export function DownloadButton({
   if (done) {
     return (
       <span
-        title="محفوظة على الجهاز — متاحة للاستماع بدون إنترنت"
+        title="محفوظة على جهازك ومتاحّة بدون إنترنت"
         className={`inline-flex items-center justify-center gap-1 flex-shrink-0 text-success-600 dark:text-success-400 ${
           compact ? 'p-1.5' : 'px-2 py-1.5 text-xs font-bold'
         }`}
@@ -61,21 +76,16 @@ export function DownloadButton({
   if (busy) {
     const progress = record?.progress || 0;
     const pct = Math.round(progress * 100);
+    const label = opaque ? 'جارٍ الحفظ' : record?.status === 'queued' ? 'في الانتظار' : `${pct}%`;
     return (
       <button
         onClick={() => cancel(episode.id)}
-        title={opaque ? 'إلغاء التنزيل — جارٍ الحفظ' : `إلغاء التنزيل — ${pct}%`}
-        aria-label={`إلغاء التنزيل — ${pct}%`}
+        title={opaque ? 'جارٍ حفظ الحلقة للتشغيل بدون إنترنت' : `جارٍ التنزيل ${pct}% - اضغط للإلغاء`}
+        aria-label={`جارٍ التنزيل ${pct}%`}
         className={`${base} text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30`}
       >
-        {compact ? (
-          <ProgressRing value={progress} />
-        ) : (
-          <>
-            <Loader2 size={16} className="animate-spin" />
-            {opaque ? 'جارٍ التنزيل' : `${pct}%`}
-          </>
-        )}
+        {compact ? <ProgressRing value={progress} /> : <Loader2 size={16} className="animate-spin" />}
+        {!compact && label}
       </button>
     );
   }
@@ -84,11 +94,11 @@ export function DownloadButton({
     return (
       <button
         onClick={() => retry(episode.id)}
-        title="إعادة محاولة التنزيل"
+        title={record?.error || 'فشل التنزيل - اضغط لإعادة المحاولة'}
         className={`${base} text-warning-600 dark:text-warning-400 hover:bg-warning-50 dark:hover:bg-warning-900/20`}
       >
         <RotateCcw size={compact ? 18 : 16} />
-        {!compact && 'إعادة'}
+        {!compact && 'إعادة المحاولة'}
       </button>
     );
   }
@@ -96,7 +106,7 @@ export function DownloadButton({
   return (
     <button
       onClick={() => downloadEpisode(episode, podcast)}
-      title="تنزيل الحلقة للاستماع بدون إنترنت"
+      title="تنزيل الحلقة للتشغيل بدون إنترنت"
       className={`${base} text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30`}
     >
       <Download size={compact ? 18 : 16} />
@@ -122,17 +132,17 @@ export function DownloadPodcastButton({
     <button
       onClick={() => void downloadPodcast(podcastId)}
       disabled={busy || remaining === 0}
-      title="تنزيل كل حلقات السلسلة للاستماع بدون إنترنت"
+      title="تنزيل كل حلقات هذا البودكاست للاستماع بدون إنترنت"
       className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm bg-success-600 text-white hover:bg-success-700 disabled:opacity-60 transition-all active:scale-95"
     >
       {busy ? <Loader2 size={17} className="animate-spin" /> : <Download size={17} />}
       {busy
-        ? 'جارٍ تجهيز السلسلة…'
+        ? 'جارٍ تنزيل الحلقات...'
         : remaining === 0
-          ? 'السلسلة محمّلة بالكامل'
+          ? 'كل الحلقات محفوظة'
           : queued > 0
-            ? `متابعة التنزيل (${remaining})`
-            : `تنزيل السلسلة (${count} حلقة)`}
+            ? `استكمال التنزيل (${remaining})`
+            : `تنزيل الكل (${count} حلقة)`}
     </button>
   );
 }
