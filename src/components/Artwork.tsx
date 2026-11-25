@@ -30,6 +30,50 @@ interface ArtworkProps {
   imageClassName?: string;
 }
 
+// Hosts that publish 3000px originals (some over 1 MB) are served through a
+// small resize proxy. Native resize rules are used where the host supports them.
+const RESIZE_PROXY_HOSTS = ['d3t3ozftmdmh3i.cloudfront.net', 'media.rss.com'];
+
+function optimizeImageUrl(value?: string | null): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  // Some RSS feeds store HTML-escaped query strings (&amp;), which breaks resize params.
+  let url = trimmed.replace(/&amp;/gi, '&');
+
+  // SoundCloud artwork: -t3000x3000.jpg → -t500x500.jpg (547 KB → 34 KB).
+  url = url.replace(/-(t)(\d+)x(\d+)\.(jpg|jpeg|png|webp)(\?.*)?$/i, (match, prefix: string, w: string, h: string, ext: string, query?: string) => {
+    return Math.max(Number(w), Number(h)) > 600 ? `-t500x500.${ext}${query || ''}` : match;
+  });
+
+  try {
+    const parsed = new URL(url);
+
+    // imgix: max-w=3000&max-h=3000 → w=400&h=400 (361 KB → 18 KB).
+    if (/imgix\.net$/i.test(parsed.hostname) && (parsed.searchParams.has('max-w') || parsed.searchParams.has('max-h'))) {
+      parsed.searchParams.delete('max-w');
+      parsed.searchParams.delete('max-h');
+      parsed.searchParams.set('w', '400');
+      parsed.searchParams.set('h', '400');
+      parsed.searchParams.set('fit', 'crop');
+      url = parsed.toString();
+    }
+
+    if (/graph\.facebook\.com$/i.test(parsed.hostname) && parsed.pathname.includes('/picture')) {
+      parsed.searchParams.set('width', '400');
+      parsed.searchParams.set('height', '400');
+      url = parsed.toString();
+    }
+
+    if (RESIZE_PROXY_HOSTS.includes(parsed.hostname)) {
+      url = `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=400&h=400&fit=cover&output=jpg`;
+    }
+  } catch {
+    // Keep the original URL if it cannot be parsed.
+  }
+
+  return url;
+}
+
 /**
  * Artwork that never shows a broken image icon.
  *
@@ -78,12 +122,18 @@ export default function Artwork({
   className = '',
   imageClassName = '',
 }: ArtworkProps) {
-  const candidates = useMemo(
-    () => Array.from(new Set(
-      [src, fallbackSrc].filter((value): value is string => Boolean(value && value.trim())),
-    )),
-    [src, fallbackSrc],
-  );
+  const candidates = useMemo(() => {
+    const list: string[] = [];
+    for (const raw of [src, fallbackSrc]) {
+      const clean = raw?.trim();
+      if (!clean) continue;
+      const optimized = optimizeImageUrl(clean);
+      if (optimized && !list.includes(optimized)) list.push(optimized);
+      // If the proxy/tweak fails, still try the original URL before local art.
+      if (optimized && optimized !== clean && !list.includes(clean)) list.push(clean);
+    }
+    return list;
+  }, [src, fallbackSrc]);
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
