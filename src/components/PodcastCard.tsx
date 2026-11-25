@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { quickEpisodeFor, rememberEpisodes } from '@/lib/quickPlay';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { Badge } from '@/components/ui';
+import { PodcastArtwork } from '@/components/Artwork';
 import { typeLabels, levelLabels } from '@/types/podcast';
 
 interface PodcastCardProps {
@@ -97,7 +98,6 @@ export function PodcastCard({ podcast, onToggleFavorite, compact = false }: Podc
 
   const hostLink = podcast.host?.slug ? `/hosts/${podcast.host.slug}` : null;
   const hostName = podcast.host?.name_ar || podcast.host_name;
-  const coverUrl = podcast.cover_url || podcast.host?.photo_url || '';
 
   // The whole card is already a <Link>; nesting another <a> inside it is
   // invalid HTML, so navigate in JS from a span that looks like a link.
@@ -113,20 +113,12 @@ export function PodcastCard({ podcast, onToggleFavorite, compact = false }: Podc
         to={`/podcasts/${podcast.id}`}
         className="flex-shrink-0 w-40 lg:w-48 group"
       >
-        <div className="relative w-full aspect-square rounded-2xl overflow-hidden mb-2 bg-neutral-200 dark:bg-neutral-800">
-          {coverUrl ? (
-            <img
-              src={coverUrl}
-              alt={podcast.title}
-              loading="lazy"
-              decoding="async"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-primary-700 to-primary-900 flex items-center justify-center text-white/90 text-3xl font-extrabold">
-              {podcast.title.charAt(0)}
-            </div>
-          )}
+        <div className="relative w-full aspect-square mb-2">
+          <PodcastArtwork
+            podcast={podcast}
+            className="h-full w-full rounded-2xl"
+            imageClassName="group-hover:scale-105 transition-transform duration-300"
+          />
           <button
             onClick={handlePlay}
             onMouseEnter={() => { void episodesFor(podcast.id); }}
@@ -169,20 +161,12 @@ export function PodcastCard({ podcast, onToggleFavorite, compact = false }: Podc
       to={`/podcasts/${podcast.id}`}
       className="card-base p-4 card-hover group block"
     >
-      <div className="relative w-full aspect-square rounded-xl overflow-hidden mb-3 bg-neutral-200 dark:bg-neutral-800">
-        {coverUrl ? (
-          <img
-            src={coverUrl}
-            alt={podcast.title}
-            loading="lazy"
-            decoding="async"
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-primary-700 to-primary-900 flex items-center justify-center text-white/90 text-4xl font-extrabold">
-            {podcast.title.charAt(0)}
-          </div>
-        )}
+      <div className="relative w-full aspect-square mb-3">
+        <PodcastArtwork
+          podcast={podcast}
+          className="h-full w-full rounded-xl"
+          imageClassName="group-hover:scale-105 transition-transform duration-300"
+        />
         <button
           onClick={handlePlay}
           onMouseEnter={() => { void episodesFor(podcast.id); }}

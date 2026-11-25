@@ -17,6 +17,7 @@ import {
   Loader2,
   Heart,
 } from 'lucide-react';
+import { EpisodeArtwork } from '@/components/Artwork';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { useAuth } from '@/context/AuthContext';
 import { DownloadButton } from '@/components/DownloadButton';
@@ -105,7 +106,6 @@ export default function PlayerPage() {
 
   const total = duration > 0 ? duration : currentEpisode.duration_seconds || 0;
   const nextEpisodes = queue.slice(queueIndex + 1, queueIndex + 6);
-  const coverUrl = currentPodcast?.cover_url || currentEpisode.podcast?.cover_url || '';
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-primary-50 via-white to-neutral-50 dark:from-neutral-900 dark:via-neutral-950 dark:to-neutral-950">
@@ -140,17 +140,10 @@ export default function PlayerPage() {
         {/* Cover */}
         <div className="relative mx-auto mb-7 w-60 sm:w-72">
           <div className="absolute inset-0 translate-y-4 rounded-[2rem] bg-primary-600/20 blur-2xl" />
-          {coverUrl ? (
-            <img
-              src={coverUrl}
-              alt={currentPodcast?.title || ''}
-              className="relative aspect-square w-full rounded-[2rem] object-cover shadow-2xl ring-1 ring-black/5"
-            />
-          ) : (
-            <div className="relative flex aspect-square w-full items-center justify-center rounded-[2rem] bg-gradient-to-br from-primary-500 to-accent-500 text-white shadow-2xl">
-              <Headphones size={72} />
-            </div>
-          )}
+          <EpisodeArtwork
+            episode={currentEpisode}
+            className="relative aspect-square w-full rounded-[2rem] text-8xl shadow-2xl ring-1 ring-black/5"
+          />
         </div>
 
         {/* Episode info */}

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Search, Headphones, X, SlidersHorizontal } from 'lucide-react';
 import { Layout } from '@/components/layout';
 import { PodcastCard } from '@/components/PodcastCard';
+import { EpisodeArtwork } from '@/components/Artwork';
 import { CarouselSection } from '@/components/CarouselSection';
 import { FeaturedHosts } from '@/components/FeaturedHosts';
 import { Badge } from '@/components/ui';
@@ -365,16 +366,12 @@ export default function PodcastsPage() {
                     onClick={() => handlePlayEpisodeFromHistory(ep)}
                     className="card-base p-3 w-full text-right card-hover block"
                   >
-                    <div className="relative w-full h-32 rounded-xl overflow-hidden mb-2 bg-neutral-200 dark:bg-neutral-800">
-                      {ep.podcast?.cover_url && (
-                        <img
-                          src={ep.podcast.cover_url}
-                          alt={ep.podcast.title}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      )}
+                    <div className="relative w-full h-32 mb-2">
+                      <EpisodeArtwork
+                        episode={ep}
+                        className="h-full w-full rounded-xl"
+                        imageClassName="group-hover:scale-105 transition-transform duration-300"
+                      />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                       <div className="absolute bottom-2 left-2 w-9 h-9 rounded-full bg-primary-600 text-white flex items-center justify-center shadow-lg">
                         <Headphones size={16} />

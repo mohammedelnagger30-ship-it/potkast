@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Layout } from '@/components/layout';
 import { Badge, Button, Card } from '@/components/ui';
+import { EpisodeArtwork, HostArtwork, PodcastArtwork } from '@/components/Artwork';
 import { useAuth } from '@/context/AuthContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { DownloadButton, DownloadPodcastButton } from '@/components/DownloadButton';
@@ -324,20 +325,10 @@ export default function PodcastDetailPage() {
           <div className="flex flex-col sm:flex-row gap-4">
             {/* Cover */}
             <div className="flex-shrink-0">
-              {(() => {
-                const cover = podcast.cover_url || podcast.host?.photo_url || '';
-                return cover ? (
-                  <img
-                    src={cover}
-                    alt={podcast.title}
-                    className="w-28 h-28 lg:w-32 lg:h-32 rounded-2xl object-cover shadow-lg border-4 border-white dark:border-neutral-900"
-                  />
-                ) : (
-                  <div className="w-28 h-28 lg:w-32 lg:h-32 rounded-2xl bg-gradient-to-br from-primary-700 to-primary-900 flex items-center justify-center text-white text-4xl font-extrabold shadow-lg border-4 border-white dark:border-neutral-900">
-                    {podcast.title.charAt(0)}
-                  </div>
-                );
-              })()}
+              <PodcastArtwork
+                podcast={podcast}
+                className="h-28 w-28 rounded-2xl text-4xl shadow-lg ring-4 ring-white dark:ring-neutral-900 sm:h-32 sm:w-32"
+              />
             </div>
 
             {/* Info */}
@@ -416,15 +407,7 @@ export default function PodcastDetailPage() {
               to={`/hosts/${podcast.host.slug}`}
               className="mt-3 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/50 flex items-center gap-3 hover:ring-1 hover:ring-primary-300 transition-all group"
             >
-              <div className="w-11 h-11 rounded-full overflow-hidden flex-shrink-0 bg-neutral-200 dark:bg-neutral-700">
-                {podcast.host.photo_url ? (
-                  <img src={podcast.host.photo_url} alt={podcast.host.name_ar} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center font-extrabold text-primary-600">
-                    {podcast.host.name_ar.charAt(0)}
-                  </div>
-                )}
-              </div>
+              <HostArtwork host={podcast.host} className="h-11 w-11 flex-shrink-0 rounded-full" />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-neutral-400 mb-0.5 flex items-center gap-1">
                   المقدم
@@ -502,18 +485,9 @@ export default function PodcastDetailPage() {
               {isCurrent && <span className="absolute right-0 top-0 h-full w-1 bg-primary-500" />}
 
               <div className="flex items-center gap-3.5 p-3.5 sm:p-4">
-                {/* Episode image */}
-                <div className="relative flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-neutral-200 dark:bg-neutral-800">
-                  {(() => {
-                    const thumb = ep.image_url || podcast.cover_url || podcast.host?.photo_url || '';
-                    return thumb ? (
-                      <img src={thumb} alt={ep.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-primary-700 to-primary-900 flex items-center justify-center text-white text-lg font-extrabold">
-                        {ep.title.charAt(0)}
-                      </div>
-                    );
-                  })()}
+                {/* Episode image — unique per episode, never a shared podcast cover */}
+                <div className="relative flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16">
+                  <EpisodeArtwork episode={ep} className="h-full w-full rounded-xl text-lg" />
                   <button
                     onClick={() => handlePlayEpisode(ep)}
                     disabled={!ep.audio_url}

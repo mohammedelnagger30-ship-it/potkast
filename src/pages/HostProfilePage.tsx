@@ -18,6 +18,7 @@ import {
 import { Layout } from '@/components/layout';
 import { Button, Badge, ProgressBar } from '@/components/ui';
 import { PodcastCard } from '@/components/PodcastCard';
+import { HostArtwork, PodcastArtwork } from '@/components/Artwork';
 import { DownloadButton } from '@/components/DownloadButton';
 import { useAuth } from '@/context/AuthContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
@@ -336,15 +337,7 @@ export default function HostProfilePage() {
           <div className="flex flex-col sm:flex-row sm:items-end gap-4 pt-3">
             <div className="relative flex-shrink-0 -mt-20 sm:-mt-24">
               <div className="w-24 h-24 lg:w-28 lg:h-28 rounded-full p-1 bg-white dark:bg-neutral-900">
-                <div className="w-full h-full rounded-full overflow-hidden bg-neutral-200 dark:bg-neutral-800">
-                  {host.photo_url ? (
-                    <img src={host.photo_url} alt={name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-3xl font-extrabold text-primary-600">
-                      {name.charAt(0)}
-                    </div>
-                  )}
-                </div>
+                <HostArtwork host={host} className="h-full w-full rounded-full text-3xl" />
               </div>
               {host.is_verified && (
                 <span className="absolute bottom-1 left-1 w-7 h-7 rounded-full bg-primary-600 text-white flex items-center justify-center border-2 border-white dark:border-neutral-900">
@@ -565,9 +558,7 @@ function SummaryCard({ podcast }: { podcast: PodcastWithCount }) {
   return (
     <div className="card-base p-4 flex flex-col gap-3">
       <div className="flex items-start gap-3">
-        {podcast.cover_url && (
-          <img src={podcast.cover_url} alt="" loading="lazy" decoding="async" className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
-        )}
+        <PodcastArtwork podcast={podcast} className="h-12 w-12 flex-shrink-0 rounded-xl" />
         <div className="min-w-0 flex-1">
           <Link
             to={`/podcasts/${podcast.id}`}
