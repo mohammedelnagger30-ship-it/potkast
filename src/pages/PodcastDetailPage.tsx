@@ -245,6 +245,16 @@ export default function PodcastDetailPage() {
     }
   }, [user, favoriteEpisodeIds]);
 
+  // The earliest episode with its own artwork is the show's downloaded cover.
+  const episodeCover = useMemo(() => {
+    let earliest: Episode | undefined;
+    episodes.forEach((ep) => {
+      if (!ep.image_url) return;
+      if (!earliest || Date.parse(ep.published_at) < Date.parse(earliest.published_at)) earliest = ep;
+    });
+    return earliest?.image_url || '';
+  }, [episodes]);
+
   const orderedEpisodes = useMemo(() => {
     const sorted = [...episodes];
     if (episodeSort === 'series') sorted.sort(bySeries);
@@ -348,7 +358,7 @@ export default function PodcastDetailPage() {
             {/* Cover */}
             <div className="flex-shrink-0">
               {(() => {
-                const cover = podcastCoverUrl(podcast);
+                const cover = podcastCoverUrl(podcast, episodeCover);
                 return cover ? (
                   <OptimizedImage
                     src={cover}
@@ -548,7 +558,7 @@ export default function PodcastDetailPage() {
                 {/* Episode image */}
                 <div className="relative flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-neutral-200 dark:bg-neutral-800">
                   {(() => {
-                    const thumb = ep.image_url || podcastCoverUrl(podcast);
+                    const thumb = ep.image_url || podcastCoverUrl(podcast, episodeCover);
                     return thumb ? (
                       <OptimizedImage src={thumb} alt={ep.title} width={160} className="w-full h-full object-cover" />
                     ) : (

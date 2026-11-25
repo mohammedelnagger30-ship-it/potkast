@@ -14,6 +14,8 @@ interface PodcastCardProps {
   podcast: Podcast;
   onToggleFavorite?: (podcastId: string) => void;
   compact?: boolean;
+  /** Cover of the earliest episode that has its own image. */
+  episodeCover?: string | null;
 }
 
 // One lightweight lookup per podcast, reused on hover and on the actual click.
@@ -49,7 +51,7 @@ function firstPlayable(podcastId: string): Episode | undefined {
   return list?.find((ep) => ep.audio_url);
 }
 
-export function PodcastCard({ podcast, onToggleFavorite, compact = false }: PodcastCardProps) {
+export function PodcastCard({ podcast, onToggleFavorite, compact = false, episodeCover }: PodcastCardProps) {
   const navigate = useNavigate();
   const { currentEpisode, isPlaying, togglePlay, currentPodcast, playEpisode, setCurrentQueue } = useAudioPlayer();
   const [starting, setStarting] = useState(false);
@@ -100,7 +102,7 @@ export function PodcastCard({ podcast, onToggleFavorite, compact = false }: Podc
 
   const hostLink = podcast.host?.slug ? `/hosts/${podcast.host.slug}` : null;
   const hostName = podcast.host?.name_ar || podcast.host_name;
-  const coverUrl = podcastCoverUrl(podcast);
+  const coverUrl = podcastCoverUrl(podcast, episodeCover);
 
   // The whole card is already a <Link>; nesting another <a> inside it is
   // invalid HTML, so navigate in JS from a span that looks like a link.

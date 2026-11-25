@@ -108,7 +108,7 @@ export default function PlayerPage() {
   const total = duration > 0 ? duration : currentEpisode.duration_seconds || 0;
   const nextEpisodes = queue.slice(queueIndex + 1, queueIndex + 6);
   const coverSource = currentPodcast || currentEpisode.podcast;
-  const coverUrl = coverSource ? podcastCoverUrl(coverSource) : '';
+  const coverUrl = coverSource ? podcastCoverUrl(coverSource, currentEpisode.image_url) : '';
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-primary-50 via-white to-neutral-50 dark:from-neutral-900 dark:via-neutral-950 dark:to-neutral-950">

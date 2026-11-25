@@ -57,7 +57,7 @@ export function AudioPlayer() {
   if (!currentEpisode) return null;
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
-  const coverUrl = currentPodcast ? podcastCoverUrl(currentPodcast) : '';
+  const coverUrl = currentPodcast ? podcastCoverUrl(currentPodcast, currentEpisode.image_url) : '';
   const podcastTitle = currentPodcast?.title || '';
   const host = currentPodcast?.host;
 

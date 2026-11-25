@@ -34,6 +34,7 @@ export default function PodcastsPage() {
   const [continueEpisodes, setContinueEpisodes] = useState<(Episode & { podcast?: Podcast })[]>([]);
   const [loading, setLoading] = useState(!cachedCatalog);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [episodeCovers, setEpisodeCovers] = useState<Map<string, string>>(new Map());
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -71,7 +72,7 @@ export default function PodcastsPage() {
   }, []);
 
   const fetchPodcasts = useCallback(async () => {
-    const [{ data: podcastsData }, { data: categoriesData }, { data: favData }] = await Promise.all([
+    const [{ data: podcastsData }, { data: categoriesData }, { data: favData }, { data: episodeCoverData }] = await Promise.all([
       // Only card/filter fields — pulling every long description for 766 shows
       // made the list slower to open without being displayed anywhere.
       supabase
@@ -80,11 +81,24 @@ export default function PodcastsPage() {
         .order('created_at', { ascending: false }),
       supabase.from('categories').select('*, podcasts(count)').order('name_ar'),
       user ? supabase.from('favorites').select('podcast_id').eq('user_id', user.id) : Promise.resolve({ data: null }),
+      // Only episodes that actually carry artwork; the earliest one is the
+      // podcast's downloaded cover. This is a tiny query, not the whole feed.
+      supabase
+        .from('episodes')
+        .select('podcast_id,image_url,published_at')
+        .not('image_url', 'is', null)
+        .order('published_at', { ascending: true }),
     ]);
 
     const favSet = new Set<string>();
     (favData || []).forEach((f: { podcast_id: string }) => favSet.add(f.podcast_id));
     setFavorites(favSet);
+
+    const covers = new Map<string, string>();
+    (episodeCoverData || []).forEach((e: { podcast_id: string; image_url: string | null }) => {
+      if (e.image_url && !covers.has(e.podcast_id)) covers.set(e.podcast_id, e.image_url);
+    });
+    setEpisodeCovers(covers);
 
     const mappedCategories = ((categoriesData || []) as unknown as (CategoryWithCount & { podcasts?: { count: number }[] })[])
       .map(({ podcasts, ...category }) => ({
@@ -385,7 +399,7 @@ export default function PodcastsPage() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {filteredPodcasts.slice(0, visibleCount).map((p) => (
-                <PodcastCard key={p.id} podcast={p} onToggleFavorite={toggleFavorite} />
+                <PodcastCard key={p.id} podcast={p} onToggleFavorite={toggleFavorite} episodeCover={episodeCovers.get(p.id)} />
               ))}
             </div>
           )}
@@ -440,7 +454,7 @@ export default function PodcastsPage() {
               subtitle={profile?.interests?.length ? "بناءً على اهتماماتك" : "اختيارات مميزة"}
             >
               {recommended.map((p) => (
-                <PodcastCard key={p.id} podcast={p} onToggleFavorite={toggleFavorite} compact />
+                <PodcastCard key={p.id} podcast={p} onToggleFavorite={toggleFavorite} episodeCover={episodeCovers.get(p.id)} compact />
               ))}
             </CarouselSection>
           )}
@@ -449,7 +463,7 @@ export default function PodcastsPage() {
           {newThisWeek.length > 0 && (
             <CarouselSection title="جديد هذا الأسبوع" subtitle="أحدث الإضافات">
               {newThisWeek.map((p) => (
-                <PodcastCard key={p.id} podcast={p} onToggleFavorite={toggleFavorite} compact />
+                <PodcastCard key={p.id} podcast={p} onToggleFavorite={toggleFavorite} episodeCover={episodeCovers.get(p.id)} compact />
               ))}
             </CarouselSection>
           )}
@@ -457,7 +471,7 @@ export default function PodcastsPage() {
           {/* Most popular */}
           <CarouselSection title="الأكثر استماعاً" subtitle="ما يستمع إليه الجميع">
             {mostPopular.map((p) => (
-              <PodcastCard key={p.id} podcast={p} onToggleFavorite={toggleFavorite} compact />
+              <PodcastCard key={p.id} podcast={p} onToggleFavorite={toggleFavorite} episodeCover={episodeCovers.get(p.id)} compact />
             ))}
           </CarouselSection>
 
@@ -466,7 +480,7 @@ export default function PodcastsPage() {
             <h2 className="text-lg font-extrabold text-neutral-900 dark:text-white mb-4">تصفّح الكل</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {allPodcasts.slice(0, visibleCount).map((p) => (
-                <PodcastCard key={p.id} podcast={p} onToggleFavorite={toggleFavorite} />
+                <PodcastCard key={p.id} podcast={p} onToggleFavorite={toggleFavorite} episodeCover={episodeCovers.get(p.id)} />
               ))}
             </div>
             {allPodcasts.length > visibleCount && (
