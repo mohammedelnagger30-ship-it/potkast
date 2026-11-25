@@ -9,9 +9,11 @@ import { useAudioPlayer } from '@/context/AudioPlayerContext';
 interface LayoutProps {
   title: string;
   children: ReactNode;
+  /** Dashboards need the full width; reading pages stay comfortably narrow. */
+  wide?: boolean;
 }
 
-export function Layout({ title, children }: LayoutProps) {
+export function Layout({ title, children, wide = false }: LayoutProps) {
   const { currentEpisode } = useAudioPlayer();
   const hasPlayer = !!currentEpisode;
 
@@ -28,7 +30,7 @@ export function Layout({ title, children }: LayoutProps) {
             hasPlayer ? 'pb-40 lg:pb-28' : 'pb-24 lg:pb-8'
           }`}
         >
-          <div className="max-w-5xl mx-auto">{children}</div>
+          <div className={wide ? 'max-w-[1400px] mx-auto w-full' : 'max-w-5xl mx-auto w-full'}>{children}</div>
         </main>
       </div>
 

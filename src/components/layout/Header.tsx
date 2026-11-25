@@ -1,9 +1,11 @@
-import { Moon, Sun, Bell, Download, Settings2, UserRound } from 'lucide-react';
+import { Moon, Sun, Bell, Download, Settings2, UserRound, ShieldCheck } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
+import { useAdminStatus } from '@/lib/admin';
 import { Link } from 'react-router-dom';
 
 export function Header({ title }: { title: string }) {
   const { theme, toggleTheme } = useTheme();
+  const { isAdmin } = useAdminStatus();
 
   return (
     <header className="sticky top-0 z-40 glass-effect border-b border-neutral-200 dark:border-neutral-800">
@@ -41,6 +43,16 @@ export function Header({ title }: { title: string }) {
           >
             <Settings2 size={20} />
           </Link>
+          {isAdmin && (
+            <Link
+              to="/admin"
+              className="flex items-center justify-center w-10 h-10 rounded-xl text-primary-600 hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/20 transition-all duration-200"
+              aria-label="لوحة الأدمن"
+              title="لوحة الأدمن"
+            >
+              <ShieldCheck size={20} />
+            </Link>
+          )}
           <button
             onClick={toggleTheme}
             className="flex items-center justify-center w-10 h-10 rounded-xl text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800 transition-all duration-200"

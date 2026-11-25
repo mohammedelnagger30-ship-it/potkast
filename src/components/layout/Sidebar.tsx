@@ -1,12 +1,14 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Sparkles, Moon, Sun, LogOut } from 'lucide-react';
+import { Sparkles, Moon, Sun, LogOut, ShieldCheck } from 'lucide-react';
 import { navItems } from './navConfig';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
+import { useAdminStatus } from '@/lib/admin';
 
 export function Sidebar() {
   const { theme, toggleTheme } = useTheme();
   const { user, profile, signOut } = useAuth();
+  const { isAdmin } = useAdminStatus();
   const navigate = useNavigate();
 
   const displayName = profile?.name || user?.email?.split('@')[0] || 'مستخدم';
@@ -49,6 +51,21 @@ export function Sidebar() {
             {item.label}
           </NavLink>
         ))}
+        {isAdmin && (
+          <NavLink
+            to="/admin"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-base transition-all duration-200 ${
+                isActive
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'text-primary-600 hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/20'
+              }`
+            }
+          >
+            <ShieldCheck size={22} />
+            لوحة الأدمن
+          </NavLink>
+        )}
       </nav>
 
       {/* User info + actions */}

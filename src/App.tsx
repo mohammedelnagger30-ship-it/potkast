@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { AdminRoute } from '@/components/AdminRoute';
 import { AppLoading } from '@/components/AppLoading';
 import HomePage from '@/pages/HomePage';
 import AuthPage from '@/pages/AuthPage';
@@ -29,6 +30,7 @@ const DownloadsPage = lazy(() => import('@/pages/DownloadsPage'));
 const FavoritesPage = lazy(() => import('@/pages/FavoritesPage'));
 const UpdatesPage = lazy(() => import('@/pages/UpdatesPage'));
 const PlayerPage = lazy(() => import('@/pages/PlayerPage'));
+const AdminPage = lazy(() => import('@/pages/AdminPage'));
 
 function OnboardingGuard({ children }: { children: ReactNode }) {
   const { profile, loading } = useAuth();
@@ -261,6 +263,18 @@ function App() {
             <OnboardingGuard>
               <AchievementsPage />
             </OnboardingGuard>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Admin-only — access is checked against the Supabase JWT email */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <AdminPage />
+            </AdminRoute>
           </ProtectedRoute>
         }
       />
