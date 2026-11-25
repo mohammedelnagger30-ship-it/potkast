@@ -681,6 +681,7 @@ const HOSTS = [
     artist: "أحمد الشقيري",
     name_ar: "أحمد الشقيري",
     slug: "ahmed-al-shugairi",
+    photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Ahmad_Al-Shukairy_2010.jpg/500px-Ahmad_Al-Shukairy_2010.jpg",
     title_ar: "",
     specialty_ar: "خواطر وفكر",
     country: "السعودية",
@@ -1455,7 +1456,7 @@ async function buildCatalog(hostsToImport = HOSTS) {
       return {
         title: feed.feedTitle || show.collectionName,
         description: feed.feedDescription || cleanText(show.collectionName, 300),
-        cover_url: feed.image || show.artworkUrl600 || '',
+        cover_url: feed.image || show.artworkUrl600 || host.photoUrl || '',
         type,
         category,
         episodes: feed.episodes.sort(
@@ -1482,7 +1483,7 @@ async function buildCatalog(hostsToImport = HOSTS) {
     catalog.push({
       ...host,
       category: mainCategory,
-      photo_url: podcasts[0].cover_url,
+      photo_url: host.photoUrl || podcasts[0].cover_url,
       bio_ar: bio,
       followers_count: Math.round(episodeTotal * 11 + podcasts.length * 900),
       podcasts,

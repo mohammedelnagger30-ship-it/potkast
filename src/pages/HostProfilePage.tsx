@@ -20,6 +20,7 @@ import { Button, Badge, ProgressBar } from '@/components/ui';
 import { PodcastCard } from '@/components/PodcastCard';
 import { DownloadButton } from '@/components/DownloadButton';
 import { OptimizedImage } from '@/components/OptimizedImage';
+import { hostPhotoUrl } from '@/lib/hostPhotos';
 import { useAuth } from '@/context/AuthContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { useProgress } from '@/context/ProgressContext';
@@ -310,6 +311,7 @@ export default function HostProfilePage() {
 
   const name = host.name_ar;
   const title = host.title_ar ? `${host.title_ar} ${name}` : name;
+  const photoUrl = hostPhotoUrl(host);
   const hostProgress = getHostProgress(host.id, totalEpisodes);
 
   return (
@@ -338,8 +340,8 @@ export default function HostProfilePage() {
             <div className="relative flex-shrink-0 -mt-20 sm:-mt-24">
               <div className="w-24 h-24 lg:w-28 lg:h-28 rounded-full p-1 bg-white dark:bg-neutral-900">
                 <div className="w-full h-full rounded-full overflow-hidden bg-neutral-200 dark:bg-neutral-800">
-                  {host.photo_url ? (
-                    <OptimizedImage src={host.photo_url} alt={name} width={224} priority className="w-full h-full object-cover" />
+                  {photoUrl ? (
+                    <OptimizedImage src={photoUrl} alt={name} width={224} priority className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-3xl font-extrabold text-primary-600">
                       {name.charAt(0)}

@@ -13,6 +13,9 @@
 
 const PROXY_ORIGIN = 'https://wsrv.nl/';
 const MAX_CACHE_ENTRIES = 800;
+// Wikimedia already serves small, well-cached thumbnails and rate-limits the
+// proxy's upstream requests, so pass those URLs through unchanged.
+const DIRECT_IMAGE_HOSTS = new Set(['upload.wikimedia.org']);
 
 export type ImageAspect = 'square' | 'wide';
 
@@ -62,6 +65,7 @@ export function optimizedImageUrl(
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return url;
+    if (DIRECT_IMAGE_HOSTS.has(parsed.hostname.toLowerCase())) return url;
   } catch {
     return url;
   }
@@ -77,6 +81,11 @@ export function optimizedImageSrcSet(
 ): string {
   const url = (source || '').trim();
   if (!url || url.startsWith('/') || url.startsWith('data:') || url.startsWith('blob:') || isProxyUrl(url)) {
+    return '';
+  }
+  try {
+    if (DIRECT_IMAGE_HOSTS.has(new URL(url).hostname.toLowerCase())) return '';
+  } catch {
     return '';
   }
   return `${optimizedImageUrl(url, width, aspect)} ${width}w, ${optimizedImageUrl(url, width * 2, aspect)} ${width * 2}w`;

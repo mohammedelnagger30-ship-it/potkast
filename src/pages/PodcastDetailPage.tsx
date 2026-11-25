@@ -24,6 +24,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { DownloadButton, DownloadPodcastButton } from '@/components/DownloadButton';
 import { OptimizedImage } from '@/components/OptimizedImage';
+import { hostPhotoUrl } from '@/lib/hostPhotos';
 import { supabase } from '@/lib/supabase';
 import type { Podcast, Episode, ListeningHistory } from '@/types/podcast';
 import type { EpisodeBookmark, EpisodeNote } from '@/types/features';
@@ -326,7 +327,7 @@ export default function PodcastDetailPage() {
             {/* Cover */}
             <div className="flex-shrink-0">
               {(() => {
-                const cover = podcast.cover_url || podcast.host?.photo_url || '';
+                const cover = podcast.cover_url || hostPhotoUrl(podcast.host) || '';
                 return cover ? (
                   <OptimizedImage
                     src={cover}
@@ -421,8 +422,8 @@ export default function PodcastDetailPage() {
               className="mt-3 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/50 flex items-center gap-3 hover:ring-1 hover:ring-primary-300 transition-all group"
             >
               <div className="w-11 h-11 rounded-full overflow-hidden flex-shrink-0 bg-neutral-200 dark:bg-neutral-700">
-                {podcast.host.photo_url ? (
-                  <OptimizedImage src={podcast.host.photo_url} alt={podcast.host.name_ar} width={88} className="w-full h-full object-cover" />
+                {hostPhotoUrl(podcast.host) ? (
+                  <OptimizedImage src={hostPhotoUrl(podcast.host)} alt={podcast.host.name_ar} width={88} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center font-extrabold text-primary-600">
                     {podcast.host.name_ar.charAt(0)}
@@ -509,7 +510,7 @@ export default function PodcastDetailPage() {
                 {/* Episode image */}
                 <div className="relative flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-neutral-200 dark:bg-neutral-800">
                   {(() => {
-                    const thumb = ep.image_url || podcast.cover_url || podcast.host?.photo_url || '';
+                    const thumb = ep.image_url || podcast.cover_url || hostPhotoUrl(podcast.host) || '';
                     return thumb ? (
                       <OptimizedImage src={thumb} alt={ep.title} width={160} className="w-full h-full object-cover" />
                     ) : (

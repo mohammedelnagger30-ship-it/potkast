@@ -45,8 +45,8 @@ export function OptimizedImage({
       srcSet={srcSet || undefined}
       sizes={srcSet ? sizes : undefined}
       loading={loading ?? (priority ? 'eager' : 'lazy')}
-      fetchPriority={fetchPriority ?? (priority ? 'high' : 'low')}
       decoding="async"
+      {...{ fetchpriority: fetchPriority ?? (priority ? 'high' : 'low') }}
       onError={(event) => {
         if (!usedFallback && current !== src) {
           setUsedFallback(true);

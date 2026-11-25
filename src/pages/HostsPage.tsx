@@ -6,9 +6,10 @@ import { supabase } from '@/lib/supabase';
 import { matchesAnyArabicSearch } from '@/lib/arabicSearch';
 import type { Host } from '@/types/podcast';
 
-type SortOption = 'fame' | 'followers' | 'popular' | 'newest' | 'az';
+type SortOption = 'all' | 'fame' | 'followers' | 'popular' | 'newest' | 'az';
 
 const sortOptions: { value: SortOption; label: string }[] = [
+  { value: 'all', label: 'الكل' },
   { value: 'fame', label: 'الأكثر شهرة' },
   { value: 'followers', label: 'الأكثر متابعة' },
   { value: 'popular', label: 'الأكثر شعبية' },
@@ -21,7 +22,7 @@ export default function HostsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<SortOption>('fame');
+  const [sortBy, setSortBy] = useState<SortOption>('all');
 
   const fetchHosts = useCallback(async () => {
     const { data, error } = await supabase
@@ -57,7 +58,7 @@ export default function HostsPage() {
     return [...names].sort((a, b) => a.localeCompare(b, 'ar'));
   }, [hosts]);
 
-  const filtered = hosts
+  const filtered = useMemo(() => hosts
     .filter((h) => {
       if (
         searchQuery &&
@@ -68,6 +69,9 @@ export default function HostsPage() {
     })
     .sort((a, b) => {
       switch (sortBy) {
+        case 'all':
+          // Keep the order returned by Supabase (followers count, descending).
+          return 0;
         case 'fame': {
           const score = (h: Host) =>
             h.followers_count + (h.is_verified ? 80000 : 0) + (h.podcasts_count ?? 0) * 1500;
@@ -85,7 +89,7 @@ export default function HostsPage() {
         case 'az':
           return a.name_ar.localeCompare(b.name_ar, 'ar');
       }
-    });
+    }), [hosts, searchQuery, selectedCategory, sortBy]);
 
   const hasFilters = !!searchQuery || selectedCategory !== 'all';
 

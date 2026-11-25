@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { BadgeCheck } from 'lucide-react';
 import { OptimizedImage } from '@/components/OptimizedImage';
+import { hostPhotoUrl } from '@/lib/hostPhotos';
 import type { Host } from '@/types/podcast';
 
 interface HostCardProps {
@@ -11,6 +12,7 @@ interface HostCardProps {
 export function HostCard({ host, compact = false }: HostCardProps) {
   const name = host.name_ar;
   const title = host.title_ar ? `${host.title_ar} ${name}` : name;
+  const photoUrl = hostPhotoUrl(host);
 
   if (compact) {
     return (
@@ -18,8 +20,8 @@ export function HostCard({ host, compact = false }: HostCardProps) {
         <div className="relative w-28 h-28 mx-auto mb-2">
           <div className="w-full h-full rounded-full p-[3px] bg-gradient-to-br from-primary-500 to-accent-500 group-hover:scale-105 transition-transform duration-300">
             <div className="w-full h-full rounded-full overflow-hidden bg-neutral-200 dark:bg-neutral-800">
-              {host.photo_url ? (
-                <OptimizedImage src={host.photo_url} alt={name} width={160} className="w-full h-full object-cover" />
+              {photoUrl ? (
+                <OptimizedImage src={photoUrl} alt={name} width={160} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-2xl font-extrabold text-primary-600">
                   {name.charAt(0)}
@@ -49,8 +51,8 @@ export function HostCard({ host, compact = false }: HostCardProps) {
       <div className="relative mb-3">
         <div className="w-20 h-20 rounded-full p-[3px] bg-gradient-to-br from-primary-500 to-accent-500 group-hover:scale-105 transition-transform duration-300">
           <div className="w-full h-full rounded-full overflow-hidden bg-neutral-200 dark:bg-neutral-800">
-            {host.photo_url ? (
-              <OptimizedImage src={host.photo_url} alt={name} width={160} className="w-full h-full object-cover" />
+            {photoUrl ? (
+              <OptimizedImage src={photoUrl} alt={name} width={160} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-2xl font-extrabold text-primary-600">
                 {name.charAt(0)}

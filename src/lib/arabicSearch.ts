@@ -1,14 +1,14 @@
 const ARABIC_DIACRITICS = /[\u064B-\u065F\u0670\u0640]/g;
 
 const ARABIC_MAP: Array<[RegExp, string]> = [
-  /[أإآٱ]/g, 'ا',
-  /[ى]/g, 'ي',
-  /[ؤ]/g, 'و',
-  /[ئ]/g, 'ي',
-  /[ة]/g, 'ه',
-  /[ڪ]/g, 'ك',
-  /[ی]/g, 'ي',
-  /[ۀ]/g, 'ه',
+  [/[أإآٱ]/g, 'ا'],
+  [/[ى]/g, 'ي'],
+  [/[ؤ]/g, 'و'],
+  [/[ئ]/g, 'ي'],
+  [/[ة]/g, 'ه'],
+  [/[ڪ]/g, 'ك'],
+  [/[ی]/g, 'ي'],
+  [/[ۀ]/g, 'ه'],
 ];
 
 export function normalizeArabicSearch(value: string | null | undefined): string {

@@ -12,6 +12,7 @@
     - مسارات التعلّم + خطواتها
     - إصلاحات الصور/الصوت، المفضلة، إزالة مصطفى حسني، توحيد ياسر الحزيمي
     - الشيخ أحمد العزب: كل دوراته وحلاقاته (193 حلقة صوتية حقيقية)
+    - صورة أحمد الشقيري (من Wikimedia Commons) للمقدم و دوراته الثلاث
 */
 
 BEGIN;
@@ -1350,5 +1351,20 @@ SET published_at = TIMESTAMPTZ '2024-03-06T17:44:10+00:00'
 WHERE e.podcast_id = 'f82d55fe-68a0-4dbd-86d6-592d57a93288'::uuid
   AND e.audio_url LIKE 'https://archive.org/download/20240306_20240306_1943/%'
   AND substring(e.audio_url from '/([0-9]{3})%20') ~ '^[0-9]+$';
+
+-- ========================================================================
+-- 9) صورة أحمد الشقيري (المصدر: Wikimedia Commons / Wikidata)
+-- ========================================================================
+-- خلاصة RSS عنده بدون صورة، فالصورة دي من صفحته على Wikimedia Commons.
+UPDATE hosts
+SET photo_url = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Ahmad_Al-Shukairy_2010.jpg/500px-Ahmad_Al-Shukairy_2010.jpg',
+    cover_url = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Ahmad_Al-Shukairy_2010.jpg/500px-Ahmad_Al-Shukairy_2010.jpg'
+WHERE slug IN ('ahmed-al-shugairi', 'ahmad-al-shugairi')
+  AND (photo_url IS NULL OR photo_url = '' OR cover_url IS NULL OR cover_url = '');
+
+UPDATE podcasts
+SET cover_url = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Ahmad_Al-Shukairy_2010.jpg/500px-Ahmad_Al-Shukairy_2010.jpg'
+WHERE host_id IN (SELECT id FROM hosts WHERE slug IN ('ahmed-al-shugairi', 'ahmad-al-shugairi'))
+  AND (cover_url IS NULL OR cover_url = '');
 
 COMMIT;
