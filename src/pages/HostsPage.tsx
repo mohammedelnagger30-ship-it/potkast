@@ -4,6 +4,12 @@ import { Layout } from '@/components/layout';
 import { HostCard } from '@/components/HostCard';
 import { supabase } from '@/lib/supabase';
 import { matchesAnyArabicSearch } from '@/lib/arabicSearch';
+import {
+  AHMED_ARABI_COURSES,
+  AHMED_ARABI_EPISODE_IDS,
+  AHMED_ARABI_HOST,
+  AHMED_ARABI_SLUG,
+} from '@/lib/ahmedArabi';
 import type { Host } from '@/types/podcast';
 
 type SortOption = 'all' | 'fame' | 'followers' | 'popular' | 'newest' | 'az';
@@ -106,6 +112,27 @@ export default function HostsPage() {
           categories: [...categoryNames],
         };
       });
+    // د. أحمد العربي presents series inside other shows (فاهم / بدون ورق), so a
+    // normal host_id aggregate would show zero. Merge the verified credit
+    // counts whether or not the SQL migration has been applied yet.
+    const ahmedCategory = AHMED_ARABI_HOST.category?.name_ar || 'روحاني / ديني';
+    const ahmedStats: HostStats = {
+      ...(mapped.find((h) => h.slug === AHMED_ARABI_SLUG) || AHMED_ARABI_HOST),
+      podcasts_count: AHMED_ARABI_COURSES.length,
+      episodes_count: AHMED_ARABI_EPISODE_IDS.length,
+      avg_rating: 0,
+      categories: [
+        ...new Set([
+          ...(mapped.find((h) => h.slug === AHMED_ARABI_SLUG)?.categories || []),
+          ahmedCategory,
+        ]),
+      ],
+    };
+    const ahmedIndex = mapped.findIndex((h) => h.slug === AHMED_ARABI_SLUG);
+    if (ahmedIndex >= 0) mapped[ahmedIndex] = ahmedStats;
+    else mapped.push(ahmedStats);
+    mapped.sort((a, b) => safeNumber(b.followers_count) - safeNumber(a.followers_count));
+
     setHosts(mapped);
     setLoading(false);
   }, []);

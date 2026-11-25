@@ -41,6 +41,7 @@ export function episodeNumber(title: string): number | null {
     /^\s*(\d{1,4})(?!\d)/,
     /(?:الحلقة|الدرس|الجزء|الفصل|الجلسة|المحاضرة|اللقاء)\s*(\d{1,4})(?!\d)/,
     /[»›:]\s*(\d{1,4})(?!\d)/,
+    /[-–—_]\s*\((\d{1,4})\)/,
     /[-–—_]\s*(\d{1,4})(?!\d)/,
   ];
   for (const pattern of patterns) {

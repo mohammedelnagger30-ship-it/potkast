@@ -12,7 +12,16 @@ export interface FeaturedPerson {
   slug: string;
 }
 
+import { AHMED_ARABI_PHOTO } from './ahmedArabi';
+
 export const FEATURED_HOSTS: FeaturedPerson[] = [
+  {
+    name: 'د. أحمد العربي',
+    title: 'داعية ومحاضر',
+    specialty: 'العبادات والتزكية',
+    photo: AHMED_ARABI_PHOTO,
+    slug: 'ahmed-arabi',
+  },
   {
     name: 'أحمد الشقيري',
     title: 'إعلامي ومقدم برامج',

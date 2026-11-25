@@ -22,7 +22,16 @@ import { DownloadButton } from '@/components/DownloadButton';
 import { OptimizedImage } from '@/components/OptimizedImage';
 import { hostPhotoUrl } from '@/lib/hostPhotos';
 import { podcastCoverUrl } from '@/lib/podcastArtwork';
-import { bySeries } from '@/lib/episodeOrder';
+import { byLatest, byPlays, bySeries } from '@/lib/episodeOrder';
+import {
+  AHMED_ARABI_COURSES,
+  AHMED_ARABI_EPISODE_IDS,
+  AHMED_ARABI_HOST,
+  AHMED_ARABI_SLUG,
+  AHMED_ARABI_SOLO_TITLE,
+  ahmedCourseForEpisode,
+  type AhmedCourse,
+} from '@/lib/ahmedArabi';
 import { useAuth } from '@/context/AuthContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { useProgress } from '@/context/ProgressContext';
@@ -31,7 +40,7 @@ import type { Host, Podcast, Episode } from '@/types/podcast';
 import { formatCount, formatDuration, formatRelativeTime } from '@/types/podcast';
 
 type FlatTab = 'latest' | 'top' | 'series';
-type EpisodeWithPod = Episode & { podcast?: Podcast };
+type EpisodeWithPod = Episode & { podcast?: Podcast; courseTitle?: string };
 type PodcastWithCount = Podcast & { episodes_count?: number };
 
 interface ListState {
@@ -61,6 +70,8 @@ const socialLabels: Record<string, string> = {
   twitter: 'تويتر',
   instagram: 'إنستغرام',
   website: 'الموقع',
+  telegram: 'تليجرام',
+  facebook: 'فيسبوك',
 };
 
 function stripHtml(value: string): string {
@@ -98,6 +109,7 @@ export default function HostProfilePage() {
     series: { items: [], hasMore: true, loading: false },
   });
 
+  const hostIsAhmed = host?.slug === AHMED_ARABI_SLUG;
   const podMap = useMemo(() => new Map(podcasts.map((p) => [p.id, p])), [podcasts]);
   const podIds = useMemo(() => podcasts.map((p) => p.id), [podcasts]);
 
@@ -109,35 +121,70 @@ export default function HostProfilePage() {
       setLoading(true);
       setHost(null);
 
+      const resolvedSlug = SLUG_ALIASES[slug || ''] || slug;
       const { data: hostData } = await supabase
         .from('hosts')
         .select('*, category:categories(*)')
-        .eq('slug', SLUG_ALIASES[slug || ''] || slug)
+        .eq('slug', resolvedSlug)
         .maybeSingle();
 
-      if (!hostData) {
+      // د. أحمد العربي presents his series inside فاهم / بدون ورق, so the
+      // database has no podcasts owned by him yet. Keep his verified profile
+      // usable until the SQL migration is run in Supabase.
+      const hostRow = (hostData as Host | null) || (resolvedSlug === AHMED_ARABI_SLUG ? AHMED_ARABI_HOST : null);
+      const hasDatabaseHost = !!hostData;
+      if (!hostRow) {
         if (!cancelled) setLoading(false);
         return;
       }
-      const hostRow = hostData as Host;
+      const isAhmed = hostRow.slug === AHMED_ARABI_SLUG;
+      // The curated list works before the SQL migration is applied. Once the
+      // episode_credits table exists, it becomes the source of truth and can
+      // include future verified appearances without another app release.
+      let ahmedIds = AHMED_ARABI_EPISODE_IDS;
 
-      // Every podcast of this host, each with its real episode count.
-      const { data: podData } = await supabase
-        .from('podcasts')
-        .select('id,title,cover_url,type,audience_level,host_name,created_at,category_id,host_id,category:categories(name_ar),episodes(count)')
-        .eq('host_id', hostRow.id)
-        .order('created_at', { ascending: false })
-        .range(0, 999);
+      let pods: PodcastWithCount[] = [];
+      let total = 0;
+      let map = new Map<string, PodcastWithCount>();
+      let ids: string[] = [];
 
-      const pods = ((podData || []) as unknown as (PodcastWithCount & { episodes?: { count: number }[] })[]).map(
-        ({ episodes: counted, ...rest }) => ({ ...rest, episodes_count: counted?.[0]?.count ?? 0 })
-      );
-      // Largest courses first makes both the summaries and the course grid
-      // predictable instead of following import timestamps.
-      pods.sort((a, b) => (b.episodes_count || 0) - (a.episodes_count || 0) || a.title.localeCompare(b.title, 'ar'));
-      const map = new Map(pods.map((p) => [p.id, p]));
-      const ids = pods.map((p) => p.id);
-      const total = pods.reduce((sum, p) => sum + (p.episodes_count || 0), 0);
+      if (isAhmed && hasDatabaseHost) {
+        const { data: creditData } = await supabase
+          .from('episode_credits')
+          .select('episode_id')
+          .eq('host_id', hostRow.id);
+        const creditedIds = (creditData || [])
+          .map((row) => row.episode_id)
+          .filter((id): id is string => !!id);
+        if (creditedIds.length > 0) {
+          ahmedIds = [
+            ...AHMED_ARABI_EPISODE_IDS.filter((id) => creditedIds.includes(id)),
+            ...creditedIds.filter((id) => !AHMED_ARABI_EPISODE_IDS.includes(id)),
+          ];
+        }
+      }
+
+      if (!isAhmed) {
+        // Every podcast of this host, each with its real episode count.
+        const { data: podData } = await supabase
+          .from('podcasts')
+          .select('id,title,cover_url,type,audience_level,host_name,created_at,category_id,host_id,category:categories(name_ar),episodes(count)')
+          .eq('host_id', hostRow.id)
+          .order('created_at', { ascending: false })
+          .range(0, 999);
+
+        pods = ((podData || []) as unknown as (PodcastWithCount & { episodes?: { count: number }[] })[]).map(
+          ({ episodes: counted, ...rest }) => ({ ...rest, episodes_count: counted?.[0]?.count ?? 0 })
+        );
+        // Largest courses first makes both the summaries and the course grid
+        // predictable instead of following import timestamps.
+        pods.sort((a, b) => (b.episodes_count || 0) - (a.episodes_count || 0) || a.title.localeCompare(b.title, 'ar'));
+        map = new Map(pods.map((p) => [p.id, p]));
+        ids = pods.map((p) => p.id);
+        total = pods.reduce((sum, p) => sum + (p.episodes_count || 0), 0);
+      } else {
+        total = ahmedIds.length;
+      }
 
       if (cancelled) return;
 
@@ -158,7 +205,20 @@ export default function HostProfilePage() {
 
       void (async () => {
         let firstItems: EpisodeWithPod[] = [];
-        if (ids.length > 0) {
+        if (isAhmed) {
+          // Gather only the rows verified to name him; the source show stays
+          // attached to each row so فاهم keeps its own presenter.
+          const { data: epData } = await supabase
+            .from('episodes')
+            .select('*, podcasts(id,title,cover_url,category_id,host_name,host_id,category:categories(name_ar))')
+            .in('id', ahmedIds);
+          firstItems = ((epData || []) as unknown as Array<Episode & { podcasts?: Podcast }>).map((ep) => ({
+            ...ep,
+            podcast: ep.podcasts,
+            courseTitle: ahmedCourseForEpisode(ep.id),
+          }));
+          firstItems.sort((a, b) => ahmedIds.indexOf(a.id) - ahmedIds.indexOf(b.id));
+        } else if (ids.length > 0) {
           const { data: epData } = await supabase
             .from('episodes')
             .select('*')
@@ -169,9 +229,13 @@ export default function HostProfilePage() {
         }
         if (cancelled) return;
         setFlat({
-          latest: { items: [], hasMore: true, loading: false },
-          top: { items: [], hasMore: true, loading: false },
-          series: { items: firstItems, hasMore: firstItems.length === PAGE_SIZE, loading: false },
+          latest: isAhmed
+            ? { items: [...firstItems].sort(byLatest), hasMore: false, loading: false }
+            : { items: [], hasMore: true, loading: false },
+          top: isAhmed
+            ? { items: [...firstItems].sort(byPlays), hasMore: false, loading: false }
+            : { items: [], hasMore: true, loading: false },
+          series: { items: firstItems, hasMore: !isAhmed && firstItems.length === PAGE_SIZE, loading: false },
         });
 
         if (user) {
@@ -195,7 +259,7 @@ export default function HostProfilePage() {
   const loadFlat = useCallback(
     async (key: FlatTab) => {
       const state = flat[key];
-      if (state.loading || !state.hasMore) return;
+      if (podIds.length === 0 || state.loading || !state.hasMore) return;
       setFlat((prev) => ({ ...prev, [key]: { ...prev[key], loading: true } }));
 
       const order = key === 'top' ? 'plays_count' : key === 'series' ? 'title' : 'published_at';
@@ -226,7 +290,7 @@ export default function HostProfilePage() {
   // Load absolutely every episode of this host, including 4-hour ones.
   // No duration or count filtering is applied here.
   const loadAllFor = useCallback(async (key: FlatTab = sort) => {
-    if (loadingAll) return;
+    if (loadingAll || podIds.length === 0) return;
     const state = flat[key];
     if (state.loading || !state.hasMore) return;
     setLoadingAll(true);
@@ -287,11 +351,14 @@ export default function HostProfilePage() {
     setFollowBusy(false);
   }, [user, host, isFollowing, followBusy]);
 
-  const totalPlays = podcasts.reduce((sum, p) => sum + (p.plays_count || 0), 0);
+  const courses = hostIsAhmed ? AHMED_ARABI_COURSES : [];
+  const totalPlays = hostIsAhmed
+    ? flat.series.items.reduce((sum, ep) => sum + (ep.plays_count || 0), 0)
+    : podcasts.reduce((sum, p) => sum + (p.plays_count || 0), 0);
   const currentList = flat[sort];
   const displayItems = useMemo(
-    () => (sort === 'series' ? [...currentList.items].sort(bySeries) : currentList.items),
-    [sort, currentList.items]
+    () => (sort === 'series' && !hostIsAhmed ? [...currentList.items].sort(bySeries) : currentList.items),
+    [sort, hostIsAhmed, currentList.items]
   );
   const displayList = useMemo(
     () => ({ ...currentList, items: displayItems }),
@@ -428,7 +495,7 @@ export default function HostProfilePage() {
           <div className="grid grid-cols-4 gap-2 mt-5">
             {[
               { icon: Users, value: formatCount(host.followers_count), label: 'متابع' },
-              { icon: Mic, value: podcasts.length.toString(), label: 'بودكاست' },
+              { icon: Mic, value: (hostIsAhmed ? courses.length : podcasts.length).toString(), label: hostIsAhmed ? 'دورات' : 'بودكاست' },
               { icon: Headphones, value: totalEpisodes.toString(), label: 'حلقة' },
               { icon: Play, value: formatCount(totalPlays), label: 'تشغيل' },
             ].map((s, i) => (
@@ -501,10 +568,27 @@ export default function HostProfilePage() {
               لمحة سريعة عن كل دورة من دورات {name}، من الوصف الأصلي للبودكاست.
             </p>
           </div>
-          <Badge variant="neutral" size="sm">{podcasts.length} ملخص</Badge>
+          <Badge variant="neutral" size="sm">{(hostIsAhmed ? courses : podcasts).length} ملخص</Badge>
         </div>
 
-        {podcasts.length === 0 ? (
+        {hostIsAhmed ? (
+          courses.length === 0 ? (
+            <EmptyState text="لا توجد موجزات لهذا المقدم بعد" />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {courses.map((course) => (
+                <AhmedCourseCard
+                  key={course.key}
+                  course={course}
+                  episodes={flat.series.items.filter((ep) => ep.courseTitle === course.title)}
+                  onPlay={(episodes) => {
+                    if (episodes.length > 0) playEpisode(episodes[0], episodes[0].podcast, episodes);
+                  }}
+                />
+              ))}
+            </div>
+          )
+        ) : podcasts.length === 0 ? (
           <EmptyState text="لا توجد موجزات لهذا المقدم بعد" />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -525,9 +609,28 @@ export default function HostProfilePage() {
         </div>
 
         <div className="flex items-center justify-between gap-3 mb-3">
-          <h3 className="font-extrabold text-neutral-800 dark:text-neutral-200">كل الدورات ({podcasts.length})</h3>
+          <h3 className="font-extrabold text-neutral-800 dark:text-neutral-200">
+            كل الدورات ({(hostIsAhmed ? courses : podcasts).length})
+          </h3>
         </div>
-        {podcasts.length === 0 ? (
+        {hostIsAhmed ? (
+          courses.length === 0 ? (
+            <EmptyState text="لا توجد دورات لهذا المقدم بعد" />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {courses.map((course) => (
+                <AhmedCourseCard
+                  key={course.key}
+                  course={course}
+                  episodes={flat.series.items.filter((ep) => ep.courseTitle === course.title)}
+                  onPlay={(episodes) => {
+                    if (episodes.length > 0) playEpisode(episodes[0], episodes[0].podcast, episodes);
+                  }}
+                />
+              ))}
+            </div>
+          )
+        ) : podcasts.length === 0 ? (
           <EmptyState text="لا توجد دورات لهذا المقدم بعد" />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -587,6 +690,7 @@ export default function HostProfilePage() {
           isPlaying={isPlaying}
           showPlays={sort === 'top'}
           groupByPodcast={sort === 'series'}
+          groupByCourse={hostIsAhmed && sort === 'series'}
         />
       </section>
     </Layout>
@@ -600,6 +704,56 @@ function EmptyState({ text }: { text: string }) {
         <Mic size={28} />
       </div>
       <p className="text-neutral-500 dark:text-neutral-400 font-semibold">{text}</p>
+    </div>
+  );
+}
+
+function AhmedCourseCard({
+  course,
+  episodes,
+  onPlay,
+}: {
+  course: AhmedCourse;
+  episodes: EpisodeWithPod[];
+  onPlay: (episodes: EpisodeWithPod[]) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const short = course.description.length > 240 ? `${course.description.slice(0, 239).trimEnd()}…` : course.description;
+
+  return (
+    <div className="card-base p-4 flex flex-col gap-3">
+      <div className="flex items-start gap-3">
+        <OptimizedImage src={course.coverUrl} alt="" width={96} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+        <div className="min-w-0 flex-1">
+          <h3 className="font-extrabold text-sm text-neutral-900 dark:text-white line-clamp-2">{course.title}</h3>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">{episodes.length} حلقة</p>
+        </div>
+      </div>
+
+      <p className="text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">
+        {expanded ? course.description : short}
+      </p>
+
+      <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+        {course.description.length > 240 ? (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="text-xs font-bold text-primary-600 dark:text-primary-400 hover:underline"
+          >
+            {expanded ? 'تصغير' : 'المزيد'}
+          </button>
+        ) : (
+          <span />
+        )}
+        <button
+          onClick={() => onPlay(episodes)}
+          disabled={episodes.length === 0}
+          className="inline-flex items-center gap-1 text-xs font-bold text-primary-600 dark:text-primary-400 hover:underline disabled:opacity-50"
+        >
+          <Play size={13} fill="currentColor" />
+          شغّل الدورة
+        </button>
+      </div>
     </div>
   );
 }
@@ -663,6 +817,7 @@ function FlatEpisodeList({
   isPlaying,
   showPlays = false,
   groupByPodcast = false,
+  groupByCourse = false,
 }: {
   state: ListState;
   onLoadMore: () => void;
@@ -674,6 +829,7 @@ function FlatEpisodeList({
   isPlaying: boolean;
   showPlays?: boolean;
   groupByPodcast?: boolean;
+  groupByCourse?: boolean;
 }) {
   if (state.items.length === 0) {
     return state.loading ? (
@@ -686,25 +842,37 @@ function FlatEpisodeList({
   }
 
   const groups = new Map<string, { id: string; title: string; items: EpisodeWithPod[] }>();
-  if (groupByPodcast) {
+  if (groupByCourse || groupByPodcast) {
     state.items.forEach((ep) => {
-      const key = ep.podcast_id || 'other';
+      const key = groupByCourse
+        ? ep.courseTitle || AHMED_ARABI_SOLO_TITLE
+        : ep.podcast_id || 'other';
       const group = groups.get(key) || {
         id: key,
-        title: ep.podcast?.title || 'حلقات أخرى',
+        title: groupByCourse
+          ? key
+          : ep.podcast?.title || 'حلقات أخرى',
         items: [],
       };
       group.items.push(ep);
       groups.set(key, group);
     });
   }
+  const courseIndex = (title: string) => {
+    if (!groupByCourse) return -1;
+    const index = AHMED_ARABI_COURSES.findIndex((course) => course.title === title);
+    return index === -1 ? AHMED_ARABI_COURSES.length : index;
+  };
   const orderedGroups = [...groups.values()].sort(
-    (a, b) => b.items.length - a.items.length || a.title.localeCompare(b.title, 'ar')
+    (a, b) =>
+      courseIndex(a.title) - courseIndex(b.title) ||
+      (groupByCourse ? 0 : b.items.length - a.items.length) ||
+      a.title.localeCompare(b.title, 'ar')
   );
 
   return (
     <div>
-      {groupByPodcast ? (
+      {groupByPodcast || groupByCourse ? (
         <div className="space-y-7">
           {orderedGroups.map((group) => (
             <section key={group.id}>

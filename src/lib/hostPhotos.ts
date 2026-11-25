@@ -1,8 +1,12 @@
+import { AHMED_ARABI_PHOTO } from './ahmedArabi';
+
 // Verified portraits that must win over stale artwork imported from RSS feeds.
 const HOST_PHOTO_OVERRIDES: Record<string, string> = {
   // د. أحمد عبد المنعم — official public profile (@A_Abdelmonem82), which links
   // to إنه القرآن. The old SoundCloud avatar is no longer representative.
   'ahmed-abdelmoneim': 'https://unavatar.io/x/A_Abdelmonem82',
+  // د. أحمد العربي — portrait from his only official channel (t.me/Ahmed_Elaraby).
+  'ahmed-arabi': AHMED_ARABI_PHOTO,
 };
 
 const HOST_PHOTO_FALLBACKS: Record<string, string> = {
