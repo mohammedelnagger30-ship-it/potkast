@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { updateStatsOnListen } from '@/lib/statsHelper';
 import { optimizedImageUrl } from '@/lib/imageUrls';
 import { localUrlFor, OFFLINE_AUDIO_PREFIX } from '@/lib/downloads';
+import { isQuranRecitationId } from '@/lib/ahmedArabiQuran';
 import {
   isMediaNotificationSupported,
   listenMediaNotificationActions,
@@ -417,7 +418,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
   const saveProgress = useCallback(
     async (episodeId: string, seconds: number, completed: boolean) => {
-      if (!user) return;
+      if (!user || isQuranRecitationId(episodeId)) return;
       const now = Date.now();
       if (now - lastSaveRef.current < SAVE_INTERVAL_MS && !completed) return;
       lastSaveRef.current = now;

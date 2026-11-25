@@ -6,6 +6,10 @@
     ("هذه القناة الرسمية الوحيدة للدكتور أحمد العربي", 179K subscribers).
   - Every credited episode below is an existing Sada episode whose title names
     him, and its public audio enclosure returned HTTP 200 on 2026-11-25.
+  - Quran recitations come from the public reciter page
+    https://way2quran.com/ar/reciters/ahmed-al-arabi (48 surahs, حفص عن عاصم).
+    All 48 MP3 enclosures returned 200/206 and stay client-side only; they are
+    not added to podcasts or episodes and never change a show's real host.
 
   IMPORTANT: This does NOT change podcasts.host_id. فاهم remains hosted by
   هلال السيد and بدون ورق remains hosted by فيصل العقل. The credit rows only
@@ -37,13 +41,14 @@ VALUES (
   'https://cdn4.telesco.pe/file/qeiNSs1bDpDs3kCiKhyTbMXcfzHQ2W5veLQsWog4lnG96XPRwzKnXnOPx2CijFu7-wfsw_Rk0mwPeKVHk_WMIp742lNZ059ArhoWO6p0OjIvHt-xiX0yirvFMd8XIUXST8VfTnNW3w0du2KVhUtnDeKXeR_JKo3iGPIvwrBZ6oKn1KOC6BHe8hQHLcUkimda0hJwe6MOnViFwRneqYg5vajjSsjmeFX_o3W8zQjJM3gzRW_QU4b6UADLkbw7gCjko2NNuiD_hUzhykQ0NqLbHJ2q2Jg-7IYyrad5ysSfc_oE-n5XJR0iTt5_YwlmiWiVml6BqYuq7SmtI-0zPIE6Dg.jpg',
   '',
   'داعية ومحاضر — العبادات والتزكية',
-  'داعية ومحاضر، حاصل على الماجستير في الفقه الإسلامي. يقدّم سلسلة «تذوق العبادات» و«رحلة الخلود» مع بودكاست فاهم، إلى جانب لقاءات ومحاضرات عن القلب السليم والتزكية. قناته الرسمية الوحيدة: t.me/Ahmed_Elaraby.',
+  'داعية ومحاضر، حاصل على الماجستير في الفقه الإسلامي. يقدّم سلسلة «تذوق العبادات» و«رحلة الخلود» مع بودكاست فاهم، إلى جانب لقاءات ومحاضرات عن القلب السليم والتزكية وتلاوات قرآنية بصوته. قناته الرسمية الوحيدة: t.me/Ahmed_Elaraby.',
   'مصر',
   'b6393bd3-deea-403f-88af-f7ae0b34736c',
   true,
   179000,
   '{
     "telegram": "https://t.me/Ahmed_Elaraby",
+    "quran": "https://way2quran.com/ar/reciters/ahmed-al-arabi",
     "youtube": "https://youtube.com/@Drahmedelarabyofficial",
     "instagram": "https://instagram.com/drahmedelarabyofficial",
     "facebook": "https://facebook.com/drahmedelarabyofficial/"

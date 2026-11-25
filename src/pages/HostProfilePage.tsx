@@ -12,6 +12,8 @@ import {
   Twitter,
   Instagram,
   Globe,
+  BookOpen,
+  ExternalLink,
   UserPlus,
   UserCheck,
 } from 'lucide-react';
@@ -36,6 +38,13 @@ import { useAuth } from '@/context/AuthContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { useProgress } from '@/context/ProgressContext';
 import { supabase } from '@/lib/supabase';
+import {
+  AHMED_QURAN_EPISODES,
+  AHMED_QURAN_PODCAST,
+  AHMED_QURAN_RECITATIONS,
+  AHMED_QURAN_SOURCE_URL,
+  isQuranRecitationId,
+} from '@/lib/ahmedArabiQuran';
 import type { Host, Podcast, Episode } from '@/types/podcast';
 import { formatCount, formatDuration, formatRelativeTime } from '@/types/podcast';
 
@@ -63,6 +72,7 @@ const socialIcons: Record<string, typeof Youtube> = {
   twitter: Twitter,
   instagram: Instagram,
   website: Globe,
+  quran: BookOpen,
 };
 
 const socialLabels: Record<string, string> = {
@@ -72,6 +82,7 @@ const socialLabels: Record<string, string> = {
   website: 'الموقع',
   telegram: 'تليجرام',
   facebook: 'فيسبوك',
+  quran: 'التلاوات',
 };
 
 function stripHtml(value: string): string {
@@ -383,6 +394,22 @@ export default function HostProfilePage() {
     }
   };
 
+  const handlePlayQuran = () => {
+    if (isQuranRecitationId(currentEpisode?.id)) {
+      togglePlay();
+    } else {
+      playEpisode(AHMED_QURAN_EPISODES[0], AHMED_QURAN_PODCAST, AHMED_QURAN_EPISODES);
+    }
+  };
+
+  const handlePlayQuranEpisode = (episode: Episode) => {
+    if (currentEpisode?.id === episode.id) {
+      togglePlay();
+    } else {
+      playEpisode(episode, AHMED_QURAN_PODCAST, AHMED_QURAN_EPISODES);
+    }
+  };
+
   if (loading) {
     return (
       <Layout title="المقدم">
@@ -492,11 +519,14 @@ export default function HostProfilePage() {
           </div>
 
           {/* Stats row */}
-          <div className="grid grid-cols-4 gap-2 mt-5">
+          <div className={`grid gap-2 mt-5 ${hostIsAhmed ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-4'}`}>
             {[
               { icon: Users, value: formatCount(host.followers_count), label: 'متابع' },
               { icon: Mic, value: (hostIsAhmed ? courses.length : podcasts.length).toString(), label: hostIsAhmed ? 'دورات' : 'بودكاست' },
               { icon: Headphones, value: totalEpisodes.toString(), label: 'حلقة' },
+              ...(hostIsAhmed
+                ? [{ icon: BookOpen, value: AHMED_QURAN_EPISODES.length.toLocaleString('ar-EG'), label: 'تلاوة' }]
+                : []),
               { icon: Play, value: formatCount(totalPlays), label: 'تشغيل' },
             ].map((s, i) => (
               <div key={i} className="flex flex-col items-center py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/60">
@@ -558,6 +588,17 @@ export default function HostProfilePage() {
           <span>تقدّم الاستماع: {hostProgress.listenPercent}%</span>
         </div>
       </div>
+
+      {hostIsAhmed && (
+        <QuranRecitationsSection
+          episodes={AHMED_QURAN_EPISODES}
+          sourceUrl={AHMED_QURAN_SOURCE_URL}
+          currentEpisodeId={currentEpisode?.id}
+          isPlaying={isPlaying}
+          onPlayAll={handlePlayQuran}
+          onPlay={handlePlayQuranEpisode}
+        />
+      )}
 
       {/* ---------- Part 1: summaries of every course ---------- */}
       <section id="summaries" className="mb-8 animate-fade-in-up">
@@ -705,6 +746,109 @@ function EmptyState({ text }: { text: string }) {
       </div>
       <p className="text-neutral-500 dark:text-neutral-400 font-semibold">{text}</p>
     </div>
+  );
+}
+
+function QuranRecitationsSection({
+  episodes,
+  sourceUrl,
+  currentEpisodeId,
+  isPlaying,
+  onPlayAll,
+  onPlay,
+}: {
+  episodes: Episode[];
+  sourceUrl: string;
+  currentEpisodeId?: string;
+  isPlaying: boolean;
+  onPlayAll: () => void;
+  onPlay: (episode: Episode) => void;
+}) {
+  const surahNumbers = useMemo(
+    () => new Map(AHMED_QURAN_RECITATIONS.map((item) => [item.id, item.surahNumber])),
+    []
+  );
+  const wholeQueuePlaying = episodes.some((episode) => episode.id === currentEpisodeId) && isPlaying;
+
+  return (
+    <section id="quran" className="mb-6 animate-fade-in-up">
+      <div className="card-base p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 flex items-center justify-center flex-shrink-0">
+              <BookOpen size={22} />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-lg lg:text-xl font-extrabold text-neutral-900 dark:text-white">تلاوة القرآن</h2>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+                السور المتاحة بصوت د. أحمد العربي — منفصلة عن حلقات فاهم وبدون ورق، وغير داخل عدّاد الحلقات.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="neutral" size="sm">حفص عن عاصم</Badge>
+            <button
+              onClick={onPlayAll}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm bg-accent-500 text-white hover:bg-accent-600 transition-all active:scale-95"
+            >
+              {wholeQueuePlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
+              تشغيل الكل
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-500 dark:text-neutral-400">
+          <span>{episodes.length.toLocaleString('ar-EG')} سورة متاحة من المصدر</span>
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:underline"
+          >
+            المصدر: الطريق إلى القرآن <ExternalLink size={12} />
+          </a>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mt-4">
+          {episodes.map((episode) => {
+            const current = currentEpisodeId === episode.id;
+            const number = surahNumbers.get(episode.id);
+            return (
+              <div
+                key={episode.id}
+                className={`flex items-center gap-3 rounded-xl border p-3 transition-all ${
+                  current
+                    ? 'border-primary-400 bg-primary-50 dark:bg-primary-900/20'
+                    : 'border-neutral-200 dark:border-neutral-700 bg-neutral-50/60 dark:bg-neutral-800/40'
+                }`}
+              >
+                <span className="w-8 flex-shrink-0 text-center text-xs font-extrabold text-neutral-400">
+                  {number !== undefined ? number.toLocaleString('ar-EG') : '—'}
+                </span>
+                <button
+                  onClick={() => onPlay(episode)}
+                  className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90 ${
+                    current
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-white dark:bg-neutral-800 text-primary-600 dark:text-primary-400 hover:bg-primary-600 hover:text-white'
+                  }`}
+                  aria-label={`تشغيل ${episode.title}`}
+                >
+                  {current && isPlaying
+                    ? <Pause size={15} fill="currentColor" />
+                    : <Play size={15} fill="currentColor" className="mr-0.5" />}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 truncate">{episode.title}</h3>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">تلاوة بصوت د. أحمد العربي</p>
+                </div>
+                <Badge variant="neutral" size="sm" className="flex-shrink-0">MP3</Badge>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
   );
 }
 

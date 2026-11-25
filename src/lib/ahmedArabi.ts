@@ -32,13 +32,14 @@ export const AHMED_ARABI_HOST: Host = {
   title_ar: '',
   specialty_ar: 'داعية ومحاضر — العبادات والتزكية',
   bio_ar:
-    'داعية ومحاضر، حاصل على الماجستير في الفقه الإسلامي. يقدّم سلسلة «تذوق العبادات» و«رحلة الخلود» مع بودكاست فاهم، إلى جانب لقاءات ومحاضرات عن القلب السليم والتزكية. قناته الرسمية الوحيدة: t.me/Ahmed_Elaraby.',
+    'داعية ومحاضر، حاصل على الماجستير في الفقه الإسلامي. يقدّم سلسلة «تذوق العبادات» و«رحلة الخلود» مع بودكاست فاهم، إلى جانب لقاءات ومحاضرات عن القلب السليم والتزكية وتلاوات قرآنية بصوته. قناته الرسمية الوحيدة: t.me/Ahmed_Elaraby.',
   country: 'مصر',
   category_id: AHMED_ARABI_CATEGORY_ID,
   is_verified: true,
   followers_count: 179000,
   social_links: {
     telegram: AHMED_ARABI_SOURCE_URL,
+    quran: 'https://way2quran.com/ar/reciters/ahmed-al-arabi',
     youtube: 'https://youtube.com/@Drahmedelarabyofficial',
     instagram: 'https://instagram.com/drahmedelarabyofficial',
     facebook: 'https://facebook.com/drahmedelarabyofficial/',
