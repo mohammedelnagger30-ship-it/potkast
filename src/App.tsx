@@ -26,6 +26,7 @@ const LearningPathsPage = lazy(() => import('@/pages/LearningPathsPage'));
 const LeaderboardPage = lazy(() => import('@/pages/LeaderboardPage'));
 const AchievementsPage = lazy(() => import('@/pages/AchievementsPage'));
 const DownloadsPage = lazy(() => import('@/pages/DownloadsPage'));
+const FavoritesPage = lazy(() => import('@/pages/FavoritesPage'));
 const UpdatesPage = lazy(() => import('@/pages/UpdatesPage'));
 const PlayerPage = lazy(() => import('@/pages/PlayerPage'));
 
@@ -139,6 +140,16 @@ function App() {
           <ProtectedRoute>
             <OnboardingGuard>
               <DownloadsPage />
+            </OnboardingGuard>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/favorites"
+        element={
+          <ProtectedRoute>
+            <OnboardingGuard>
+              <FavoritesPage />
             </OnboardingGuard>
           </ProtectedRoute>
         }

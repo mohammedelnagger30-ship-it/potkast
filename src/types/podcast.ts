@@ -77,6 +77,12 @@ export interface Favorite {
   created_at: string;
 }
 
+export interface EpisodeFavorite {
+  user_id: string;
+  episode_id: string;
+  created_at: string;
+}
+
 export interface ListeningHistory {
   user_id: string;
   episode_id: string;

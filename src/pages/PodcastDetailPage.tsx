@@ -100,6 +100,7 @@ export default function PodcastDetailPage() {
   const [podcast, setPodcast] = useState<Podcast | null>(null);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [isFavorited, setIsFavorited] = useState(false);
+  const [favoriteEpisodeIds, setFavoriteEpisodeIds] = useState<Set<string>>(new Set());
   const [historyMap, setHistoryMap] = useState<Map<string, ListeningHistory>>(new Map());
   const [bookmarks, setBookmarks] = useState<EpisodeBookmark[]>([]);
   const [notes, setNotes] = useState<EpisodeNote[]>([]);
@@ -177,8 +178,9 @@ export default function PodcastDetailPage() {
 
         if (user && allEpisodes.length > 0) {
           const ids = allEpisodes.slice(0, 1000).map((e) => e.id);
-          const [favResult, histResult, bmResult, notesResult] = await Promise.all([
+          const [favResult, epFavResult, histResult, bmResult, notesResult] = await Promise.all([
             supabase.from('favorites').select('podcast_id').eq('user_id', user.id).eq('podcast_id', id).maybeSingle(),
+            supabase.from('episode_favorites').select('episode_id').eq('user_id', user.id).in('episode_id', ids),
             supabase.from('listening_history').select('*').eq('user_id', user.id).in('episode_id', ids),
             supabase.from('episode_bookmarks').select('*').eq('user_id', user.id).in('episode_id', ids),
             supabase.from('episode_notes').select('*').eq('user_id', user.id).in('episode_id', ids),
@@ -186,6 +188,7 @@ export default function PodcastDetailPage() {
           if (cancelled) return;
 
           setIsFavorited(!!favResult.data);
+          setFavoriteEpisodeIds(new Set((epFavResult.data || []).map((r: { episode_id: string }) => r.episode_id)));
           const hMap = new Map<string, ListeningHistory>();
           (histResult.data || []).forEach((h: ListeningHistory) => hMap.set(h.episode_id, h));
           setHistoryMap(hMap);
@@ -210,6 +213,23 @@ export default function PodcastDetailPage() {
       await supabase.from('favorites').delete().eq('user_id', user.id).eq('podcast_id', podcast.id);
     }
   }, [user, podcast, isFavorited]);
+
+  const toggleEpisodeFavorite = useCallback(async (episodeId: string) => {
+    if (!user) return;
+    const isFav = favoriteEpisodeIds.has(episodeId);
+    setFavoriteEpisodeIds((prev) => {
+      const next = new Set(prev);
+      if (isFav) next.delete(episodeId);
+      else next.add(episodeId);
+      return next;
+    });
+
+    if (isFav) {
+      await supabase.from('episode_favorites').delete().eq('user_id', user.id).eq('episode_id', episodeId);
+    } else {
+      await supabase.from('episode_favorites').insert({ user_id: user.id, episode_id: episodeId });
+    }
+  }, [user, favoriteEpisodeIds]);
 
   const handlePlayEpisode = (ep: Episode) => {
     if (currentEpisode?.id === ep.id) {
@@ -538,8 +558,21 @@ export default function PodcastDetailPage() {
                   )}
                 </div>
 
-                {/* Offline download */}
+                {/* Actions */}
                 <div className="flex flex-shrink-0 items-center gap-1.5">
+                  <button
+                    onClick={() => toggleEpisodeFavorite(ep.id)}
+                    disabled={!user}
+                    aria-label={favoriteEpisodeIds.has(ep.id) ? 'إزالة الحلقة من المفضلة' : 'إضافة الحلقة للمفضلة'}
+                    title={user ? (favoriteEpisodeIds.has(ep.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة') : 'سجّل دخول لإضافة للمفضلة'}
+                    className={`flex h-9 w-9 items-center justify-center rounded-xl transition-colors disabled:opacity-40 ${
+                      favoriteEpisodeIds.has(ep.id)
+                        ? 'bg-error-50 text-error-500 dark:bg-error-900/20'
+                        : 'text-neutral-400 hover:bg-neutral-100 hover:text-error-500 dark:hover:bg-neutral-800'
+                    }`}
+                  >
+                    <Heart size={16} fill={favoriteEpisodeIds.has(ep.id) ? 'currentColor' : 'none'} />
+                  </button>
                   <DownloadButton episode={ep} podcast={podcast} compact />
 
                   {/* Expand button */}

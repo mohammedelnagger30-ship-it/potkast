@@ -346,59 +346,59 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       saveProgress(currentEpisode.id, duration, true);
     }
 
+    const playAt = (idx: number) => {
+      const ep = queue[idx];
+      if (!ep || !audioRef.current) return;
+      const audio = audioRef.current;
+      const token = ++playTokenRef.current;
+      setQueueIndex(idx);
+      currentEpisodeRef.current = ep;
+      if (ep.podcast) currentPodcastRef.current = ep.podcast;
+      setCurrentEpisode(ep);
+      const local = isLocalAudioUrl(resolveAudioUrl(ep.audio_url, ep.id));
+      // When looping/auto-advancing, start episodes from the beginning.
+      const source = sourceFor(ep.id, ep.audio_url, 0);
+      audio.src = source.url;
+      audio.playbackRate = playbackRateRef.current;
+      setIsBuffering(true);
+      audio.play().catch(() => { if (token === playTokenRef.current) setIsPlaying(false); });
+      void local;
+    };
+
     if (repeatMode === 'one') {
       if (audioRef.current) {
         playTokenRef.current += 1;
         audioRef.current.currentTime = 0;
+        setIsBuffering(true);
         audioRef.current.play().catch(() => setIsPlaying(false));
       }
       return;
     }
 
-    // Play next in queue
+    // Continue to next episode in queue by default.
     if (queueIndex < queue.length - 1) {
-      const nextIdx = queueIndex + 1;
-      setQueueIndex(nextIdx);
-      const nextEp = queue[nextIdx];
-      currentEpisodeRef.current = nextEp;
-      if (nextEp.podcast) currentPodcastRef.current = nextEp.podcast;
-      setCurrentEpisode(nextEp);
-      if (audioRef.current) {
-        const audio = audioRef.current;
-        const token = ++playTokenRef.current;
-        const localNext = isLocalAudioUrl(resolveAudioUrl(nextEp.audio_url, nextEp.id));
-        const resumeAt = localNext ? cachedResumeFor(nextEp.id) : 0;
-        const source = sourceFor(nextEp.id, nextEp.audio_url, resumeAt);
-        audio.src = source.url;
-        setIsBuffering(true);
-        audio.play().catch(() => { if (token === playTokenRef.current) setIsPlaying(false); });
-        if (!source.local && resumeAt > 5) {
-          resumeAfterAudible(audio, resumeAt, () => token === playTokenRef.current && audioRef.current === audio);
-        }
-      }
-    } else if (repeatMode === 'all' && queue.length > 0) {
-      setQueueIndex(0);
-      currentEpisodeRef.current = queue[0];
-      if (queue[0].podcast) currentPodcastRef.current = queue[0].podcast;
-      setCurrentEpisode(queue[0]);
-      if (audioRef.current) {
-        const audio = audioRef.current;
-        const token = ++playTokenRef.current;
-        const localFirst = isLocalAudioUrl(resolveAudioUrl(queue[0].audio_url, queue[0].id));
-        const resumeAt = localFirst ? cachedResumeFor(queue[0].id) : 0;
-        const source = sourceFor(queue[0].id, queue[0].audio_url, resumeAt);
-        audio.src = source.url;
-        setIsBuffering(true);
-        audio.play().catch(() => { if (token === playTokenRef.current) setIsPlaying(false); });
-        if (!source.local && resumeAt > 5) {
-          resumeAfterAudible(audio, resumeAt, () => token === playTokenRef.current && audioRef.current === audio);
-        }
-      }
-    } else {
-      playTokenRef.current += 1;
-      setIsPlaying(false);
-      stopMediaNotification();
+      playAt(queueIndex + 1);
+      return;
     }
+
+    // End of queue: loop queue in "all", otherwise repeat the last episode.
+    if (queue.length > 0) {
+      if (repeatMode === 'all') {
+        playAt(0);
+      } else {
+        if (audioRef.current) {
+          playTokenRef.current += 1;
+          audioRef.current.currentTime = 0;
+          setIsBuffering(true);
+          audioRef.current.play().catch(() => setIsPlaying(false));
+        }
+      }
+      return;
+    }
+
+    playTokenRef.current += 1;
+    setIsPlaying(false);
+    stopMediaNotification();
   }, [currentEpisode, duration, queue, queueIndex, repeatMode, saveProgress]);
 
   // Auto-save progress periodically while playing

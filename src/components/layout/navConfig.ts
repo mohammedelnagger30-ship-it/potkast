@@ -1,4 +1,4 @@
-import { Home, Mic, Users, Target, TrendingUp, Bell, User, Download, Settings2, type LucideIcon } from 'lucide-react';
+import { Home, Mic, Users, Target, TrendingUp, Bell, User, Download, Settings2, Heart, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   label: string;
@@ -10,6 +10,7 @@ export const navItems: NavItem[] = [
   { label: 'الرئيسية', path: '/', icon: Home },
   { label: 'البودكاست', path: '/podcasts', icon: Mic },
   { label: 'المقدمون', path: '/hosts', icon: Users },
+  { label: 'المفضلة', path: '/favorites', icon: Heart },
   { label: 'المهام', path: '/missions', icon: Target },
   { label: 'تقدّمي', path: '/progress', icon: TrendingUp },
   { label: 'التنزيلات', path: '/downloads', icon: Download },
@@ -19,6 +20,6 @@ export const navItems: NavItem[] = [
 ];
 
 // Bottom nav fits ~5 items on small screens; the full list lives in the sidebar
-const mobilePaths = new Set(['/', '/podcasts', '/hosts', '/missions', '/progress', '/downloads']);
+const mobilePaths = new Set(['/', '/podcasts', '/favorites', '/missions', '/progress']);
 
 export const mobileNavItems: NavItem[] = navItems.filter((i) => mobilePaths.has(i.path));

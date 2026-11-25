@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -15,15 +15,19 @@ import {
   ListMusic,
   Headphones,
   Loader2,
+  Heart,
 } from 'lucide-react';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
+import { useAuth } from '@/context/AuthContext';
 import { DownloadButton } from '@/components/DownloadButton';
+import { supabase } from '@/lib/supabase';
 import { formatTime, formatDuration } from '@/types/podcast';
 
 const speedOptions = [0.75, 1, 1.25, 1.5, 2];
 
 export default function PlayerPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const {
     currentEpisode,
     currentPodcast,
@@ -48,6 +52,36 @@ export default function PlayerPage() {
   } = useAudioPlayer();
 
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [isEpisodeFavorited, setIsEpisodeFavorited] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user || !currentEpisode) {
+      setIsEpisodeFavorited(false);
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from('episode_favorites')
+        .select('episode_id')
+        .eq('user_id', user.id)
+        .eq('episode_id', currentEpisode.id)
+        .maybeSingle();
+      if (!cancelled) setIsEpisodeFavorited(!!data);
+    })();
+    return () => { cancelled = true; };
+  }, [user, currentEpisode?.id]);
+
+  const toggleEpisodeFavorite = async () => {
+    if (!user || !currentEpisode) return;
+    const next = !isEpisodeFavorited;
+    setIsEpisodeFavorited(next);
+    if (next) {
+      await supabase.from('episode_favorites').insert({ user_id: user.id, episode_id: currentEpisode.id });
+    } else {
+      await supabase.from('episode_favorites').delete().eq('user_id', user.id).eq('episode_id', currentEpisode.id);
+    }
+  };
 
   if (!currentEpisode) {
     return (
@@ -255,7 +289,7 @@ export default function PlayerPage() {
             }`}
           >
             {repeatMode === 'one' ? <Repeat1 size={16} /> : <Repeat size={16} />}
-            {repeatMode === 'none' ? 'بدون تكرار' : repeatMode === 'one' ? 'تكرار الحلقة' : 'تكرار الكل'}
+            {repeatMode === 'none' ? 'تكرار آخر حلقة' : repeatMode === 'one' ? 'تكرار الحلقة' : 'تكرار الكل'}
           </button>
 
           <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
@@ -277,6 +311,21 @@ export default function PlayerPage() {
               className="w-20 cursor-pointer accent-primary-600"
             />
           </div>
+
+          <button
+            onClick={toggleEpisodeFavorite}
+            disabled={!user}
+            aria-label={isEpisodeFavorited ? 'إزالة الحلقة من المفضلة' : 'إضافة الحلقة للمفضلة'}
+            title={user ? (isEpisodeFavorited ? 'إزالة من المفضلة' : 'إضافة للمفضلة') : 'سجّل دخول لإضافة للمفضلة'}
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold shadow-sm transition-colors disabled:opacity-40 ${
+              isEpisodeFavorited
+                ? 'border-error-200 bg-error-50 text-error-500 dark:border-error-900 dark:bg-error-900/20'
+                : 'border-neutral-200 bg-white text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400'
+            }`}
+          >
+            <Heart size={16} fill={isEpisodeFavorited ? 'currentColor' : 'none'} />
+            {isEpisodeFavorited ? 'في المفضلة' : 'مفضلة'}
+          </button>
 
           <div className="rounded-xl border border-neutral-200 bg-white px-2 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
             <DownloadButton episode={currentEpisode} podcast={currentPodcast || undefined} />

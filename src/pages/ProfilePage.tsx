@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Award, Bell, BookHeart, Calendar, CircleDot, Download, LogOut, Moon, Route,
+  Award, Bell, BookHeart, Calendar, CircleDot, Download, Heart, LogOut, Moon, Route,
   Settings2, Trophy, Zap,
 } from 'lucide-react';
 import { Layout } from '@/components/layout';
@@ -18,6 +18,7 @@ import { achievementDefs } from '@/lib/gamification';
 
 const quickLinks = [
   { icon: Settings2, label: 'كل الإعدادات', to: '/settings' },
+  { icon: Heart, label: 'المفضلة', to: '/favorites' },
   { icon: Award, label: 'إنجازاتي وأوسمتي', to: '/achievements' },
   { icon: BookHeart, label: 'مذكراتي اليومية', to: '/journal' },
   { icon: CircleDot, label: 'عجلة الحياة', to: '/life-wheel' },
