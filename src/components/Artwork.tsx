@@ -170,7 +170,7 @@ export default function Artwork({
           key={current}
           src={current}
           alt=""
-          loading="lazy"
+          loading="eager"
           decoding="async"
           onLoad={() => setLoaded(true)}
           onError={handleError}
