@@ -8,17 +8,39 @@ import type { Host } from '@/types/podcast';
 
 type SortOption = 'all' | 'fame' | 'followers' | 'popular' | 'newest' | 'az';
 
-const sortOptions: { value: SortOption; label: string }[] = [
-  { value: 'all', label: 'الكل' },
-  { value: 'fame', label: 'الأكثر شهرة' },
-  { value: 'followers', label: 'الأكثر متابعة' },
-  { value: 'popular', label: 'الأكثر شعبية' },
-  { value: 'newest', label: 'الأحدث' },
-  { value: 'az', label: 'أ - ي' },
+type HostStats = Host & {
+  podcasts_count: number;
+  episodes_count: number;
+  total_plays: number;
+  avg_rating: number;
+};
+
+type PodcastAggregate = {
+  plays_count: number | null;
+  rating_avg: number | null;
+  episodes?: { count: number }[];
+};
+
+const sortOptions: { value: SortOption; label: string; hint: string }[] = [
+  { value: 'all', label: 'الكل', hint: 'الترتيب الافتراضي من المنصة' },
+  {
+    value: 'fame',
+    label: 'الأكثر شهرة',
+    hint: 'مؤشر مركّب: المتابعون والمشاهدات والتقييم والتوثيق وحجم المكتبة',
+  },
+  { value: 'followers', label: 'الأكثر متابعة', hint: 'حسب عدد المتابعين المسجّلين' },
+  { value: 'popular', label: 'الأكثر شعبية', hint: 'حسب عدد مرات الاستماع الفعلية' },
+  { value: 'newest', label: 'الأحدث', hint: 'حسب تاريخ إضافة المقدم' },
+  { value: 'az', label: 'أ - ي', hint: 'حسب الاسم بالترتيب الأبجدي' },
 ];
 
+const safeNumber = (value: unknown): number => {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+
 export default function HostsPage() {
-  const [hosts, setHosts] = useState<Host[]>([]);
+  const [hosts, setHosts] = useState<HostStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -27,7 +49,7 @@ export default function HostsPage() {
   const fetchHosts = useCallback(async () => {
     const { data, error } = await supabase
       .from('hosts')
-      .select('*, category:categories(*), podcasts(count)')
+      .select('*, category:categories(*), podcasts(plays_count, rating_avg, episodes(count))')
       .order('followers_count', { ascending: false });
 
     if (error) {
@@ -35,10 +57,20 @@ export default function HostsPage() {
       return;
     }
 
-    const mapped = ((data || []) as unknown as (Host & { podcasts: { count: number }[] })[]).map((h) => ({
-      ...h,
-      podcasts_count: h.podcasts?.[0]?.count ?? 0,
-    }));
+    const mapped = ((data || []) as unknown as (Host & { podcasts?: PodcastAggregate[] })[])
+      .map(({ podcasts, ...host }): HostStats => {
+        const shows = podcasts || [];
+        const rated = shows.filter((p) => safeNumber(p.rating_avg) > 0);
+        return {
+          ...host,
+          podcasts_count: shows.length,
+          episodes_count: shows.reduce((sum, p) => sum + safeNumber(p.episodes?.[0]?.count), 0),
+          total_plays: shows.reduce((sum, p) => sum + safeNumber(p.plays_count), 0),
+          avg_rating: rated.length
+            ? rated.reduce((sum, p) => sum + safeNumber(p.rating_avg), 0) / rated.length
+            : 0,
+        };
+      });
     setHosts(mapped);
     setLoading(false);
   }, []);
@@ -58,38 +90,60 @@ export default function HostsPage() {
     return [...names].sort((a, b) => a.localeCompare(b, 'ar'));
   }, [hosts]);
 
-  const filtered = useMemo(() => hosts
-    .filter((h) => {
-      if (
-        searchQuery &&
-        !matchesAnyArabicSearch(searchQuery, h.name_ar, h.specialty_ar, h.title_ar, h.bio_ar, h.country)
-      ) return false;
-      if (selectedCategory !== 'all' && h.category?.name_ar !== selectedCategory) return false;
-      return true;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'all':
-          // Keep the order returned by Supabase (followers count, descending).
-          return 0;
-        case 'fame': {
-          const score = (h: Host) =>
-            h.followers_count + (h.is_verified ? 80000 : 0) + (h.podcasts_count ?? 0) * 1500;
-          return score(b) - score(a);
+  const filtered = useMemo(() => {
+    const byName = (a: HostStats, b: HostStats) => a.name_ar.localeCompare(b.name_ar, 'ar') || a.id.localeCompare(b.id);
+    const log = (n: number) => Math.log10(1 + safeNumber(n));
+    const maxFollowers = Math.max(1, ...hosts.map((h) => safeNumber(h.followers_count)));
+    const maxPlays = Math.max(1, ...hosts.map((h) => safeNumber(h.total_plays)));
+    const maxEpisodes = Math.max(1, ...hosts.map((h) => safeNumber(h.episodes_count)));
+    const norm = (value: number, max: number) => log(value) / log(max);
+    const playsPerEpisode = (h: HostStats) => safeNumber(h.total_plays) / Math.max(1, safeNumber(h.episodes_count));
+
+    // FAME is a reputation score, not a second follower sort. Each signal is
+    // normalised with a log scale so the single biggest account cannot flatten
+    // everyone else, and the weights are explicit instead of magic bonuses.
+    const fameScore = (h: HostStats) =>
+      0.42 * norm(h.followers_count, maxFollowers) +
+      0.28 * norm(h.total_plays, maxPlays) +
+      0.12 * norm(h.episodes_count, maxEpisodes) +
+      0.10 * (Math.min(5, safeNumber(h.avg_rating)) / 5) +
+      0.08 * (h.is_verified ? 1 : 0);
+
+    return hosts
+      .filter((h) => {
+        if (
+          searchQuery &&
+          !matchesAnyArabicSearch(searchQuery, h.name_ar, h.specialty_ar, h.title_ar, h.bio_ar, h.country)
+        ) return false;
+        if (selectedCategory !== 'all' && h.category?.name_ar !== selectedCategory) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        switch (sortBy) {
+          case 'all':
+            // Keep the order returned by Supabase (followers count, descending).
+            return 0;
+          case 'fame': {
+            const diff = fameScore(b) - fameScore(a);
+            if (Math.abs(diff) > 1e-6) return diff;
+            return safeNumber(b.followers_count) - safeNumber(a.followers_count) || byName(a, b);
+          }
+          case 'followers':
+            return safeNumber(b.followers_count) - safeNumber(a.followers_count)
+              || safeNumber(b.total_plays) - safeNumber(a.total_plays)
+              || byName(a, b);
+          case 'popular':
+            return safeNumber(b.total_plays) - safeNumber(a.total_plays)
+              || playsPerEpisode(b) - playsPerEpisode(a)
+              || safeNumber(b.followers_count) - safeNumber(a.followers_count)
+              || byName(a, b);
+          case 'newest':
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime() || byName(a, b);
+          case 'az':
+            return byName(a, b);
         }
-        case 'followers':
-          return b.followers_count - a.followers_count;
-        case 'popular': {
-          const pa = (a.podcasts_count ?? 0) * 1000 + a.followers_count;
-          const pb = (b.podcasts_count ?? 0) * 1000 + b.followers_count;
-          return pb - pa;
-        }
-        case 'newest':
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        case 'az':
-          return a.name_ar.localeCompare(b.name_ar, 'ar');
-      }
-    }), [hosts, searchQuery, selectedCategory, sortBy]);
+      });
+  }, [hosts, searchQuery, selectedCategory, sortBy]);
 
   const hasFilters = !!searchQuery || selectedCategory !== 'all';
 
@@ -163,6 +217,7 @@ export default function HostsPage() {
             <button
               key={opt.value}
               onClick={() => setSortBy(opt.value)}
+              title={opt.hint}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
                 sortBy === opt.value
                   ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300'
