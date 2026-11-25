@@ -122,7 +122,7 @@ export default function PodcastDetailPage() {
   const [bookmarkNote, setBookmarkNote] = useState('');
   const [bookmarkTime, setBookmarkTime] = useState('0:00');
   const [visibleEpisodes, setVisibleEpisodes] = useState(EPISODES_PER_PAGE);
-  const [episodeSort, setEpisodeSort] = useState<EpisodeSort>('latest');
+  const [episodeSort, setEpisodeSort] = useState<EpisodeSort>('series');
   const [descExpanded, setDescExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -155,7 +155,7 @@ export default function PodcastDetailPage() {
           .from('episodes')
           .select('*')
           .eq('podcast_id', id)
-          .order('published_at', { ascending: false })
+          .order('title', { ascending: true })
           .range(0, 99),
       ]);
 
@@ -181,7 +181,7 @@ export default function PodcastDetailPage() {
             .from('episodes')
             .select('*')
             .eq('podcast_id', id)
-            .order('published_at', { ascending: false })
+            .order('title', { ascending: true })
             .range(offset, offset + 99);
           const batch = (data || []) as Episode[];
           allEpisodes.push(...batch);

@@ -43,6 +43,12 @@ interface ListState {
 const PAGE_SIZE = 30;
 const BULK_PAGE_SIZE = 500;
 
+// The corrected slug lands in the database with the hosted SQL migration.
+// Until it is run, keep the old link working instead of showing a dead page.
+const SLUG_ALIASES: Record<string, string> = {
+  'saja-aljulaud': 'ibrahim-hegazy',
+};
+
 const socialIcons: Record<string, typeof Youtube> = {
   youtube: Youtube,
   twitter: Twitter,
@@ -106,7 +112,7 @@ export default function HostProfilePage() {
       const { data: hostData } = await supabase
         .from('hosts')
         .select('*, category:categories(*)')
-        .eq('slug', slug)
+        .eq('slug', SLUG_ALIASES[slug || ''] || slug)
         .maybeSingle();
 
       if (!hostData) {
@@ -140,30 +146,32 @@ export default function HostProfilePage() {
       setHost(hostRow);
       setPodcasts(pods);
       setTotalEpisodes(total);
-      setSort('latest');
+      // Start with the arranged view: every course grouped, and its episodes
+      // numbered from ١. "الأحدث" stays available as an explicit alternative.
+      setSort('series');
       setFlat({
-        latest: { items: [], hasMore: true, loading: true },
+        latest: { items: [], hasMore: true, loading: false },
         top: { items: [], hasMore: true, loading: false },
-        series: { items: [], hasMore: true, loading: false },
+        series: { items: [], hasMore: true, loading: true },
       });
       setLoading(false);
 
       void (async () => {
-        let latestItems: EpisodeWithPod[] = [];
+        let firstItems: EpisodeWithPod[] = [];
         if (ids.length > 0) {
           const { data: epData } = await supabase
             .from('episodes')
             .select('*')
             .in('podcast_id', ids)
-            .order('published_at', { ascending: false })
+            .order('title', { ascending: true })
             .range(0, PAGE_SIZE - 1);
-          latestItems = ((epData || []) as Episode[]).map((e) => ({ ...e, podcast: map.get(e.podcast_id) }));
+          firstItems = ((epData || []) as Episode[]).map((e) => ({ ...e, podcast: map.get(e.podcast_id) }));
         }
         if (cancelled) return;
         setFlat({
-          latest: { items: latestItems, hasMore: latestItems.length === PAGE_SIZE, loading: false },
+          latest: { items: [], hasMore: true, loading: false },
           top: { items: [], hasMore: true, loading: false },
-          series: { items: [], hasMore: true, loading: false },
+          series: { items: firstItems, hasMore: firstItems.length === PAGE_SIZE, loading: false },
         });
 
         if (user) {
@@ -190,24 +198,27 @@ export default function HostProfilePage() {
       if (state.loading || !state.hasMore) return;
       setFlat((prev) => ({ ...prev, [key]: { ...prev[key], loading: true } }));
 
-      const order = key === 'top' ? 'plays_count' : 'published_at';
+      const order = key === 'top' ? 'plays_count' : key === 'series' ? 'title' : 'published_at';
       const offset = state.items.length;
       const { data } = await supabase
         .from('episodes')
         .select('*')
         .in('podcast_id', podIds)
-        .order(order, { ascending: false })
+        .order(order, { ascending: key === 'series' })
         .range(offset, offset + PAGE_SIZE - 1);
 
       const rows = ((data || []) as Episode[]).map((e) => ({ ...e, podcast: podMap.get(e.podcast_id) }));
-      setFlat((prev) => ({
-        ...prev,
-        [key]: {
-          items: [...prev[key].items, ...rows],
-          hasMore: rows.length === PAGE_SIZE,
-          loading: false,
-        },
-      }));
+      setFlat((prev) => {
+        const items = [...prev[key].items, ...rows];
+        return {
+          ...prev,
+          [key]: {
+            items: key === 'series' ? items.sort(bySeries) : items,
+            hasMore: rows.length === PAGE_SIZE,
+            loading: false,
+          },
+        };
+      });
     },
     [flat, podIds, podMap]
   );
@@ -220,7 +231,7 @@ export default function HostProfilePage() {
     if (state.loading || !state.hasMore) return;
     setLoadingAll(true);
 
-    const order = key === 'top' ? 'plays_count' : 'published_at';
+    const order = key === 'top' ? 'plays_count' : key === 'series' ? 'title' : 'published_at';
     let items = [...state.items];
     let offset = items.length;
 
@@ -230,7 +241,7 @@ export default function HostProfilePage() {
           .from('episodes')
           .select('*')
           .in('podcast_id', podIds)
-          .order(order, { ascending: false })
+          .order(order, { ascending: key === 'series' })
           .range(offset, offset + BULK_PAGE_SIZE - 1);
 
         if (error || !data || data.length === 0) break;
@@ -238,6 +249,7 @@ export default function HostProfilePage() {
         offset += data.length;
         if (data.length < BULK_PAGE_SIZE) break;
       }
+      if (key === 'series') items.sort(bySeries);
       setFlat((prev) => ({ ...prev, [key]: { items, hasMore: false, loading: false } }));
     } finally {
       setLoadingAll(false);
@@ -557,8 +569,9 @@ export default function HostProfilePage() {
                   ? 'bg-primary-600 text-white'
                   : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-primary-50 dark:hover:bg-primary-900/30'
               }`}
+              title="حسب الدورة — الحلقة ١ أولاً"
             >
-              حسب الدورة
+              مرتب
             </button>
           </div>
         </div>

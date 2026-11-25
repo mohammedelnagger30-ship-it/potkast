@@ -26,11 +26,27 @@ function normalize(value: string): string {
   return value.replace(/[٠-٩]/g, (d) => ARABIC_DIGITS[d] || d).trim();
 }
 
-/** Extract the episode number from titles such as "001_..." or "الدرس السابع - ...". */
+/**
+ * Extract the episode number from real titles.
+ *
+ * Feeds use shapes like "001_..." , "الدرس السابع" and
+ * "خواطر (2) » 01 - العنوان". The number after » / - / : is the episode, not
+ * the season number in brackets, so prefer those markers before falling back
+ * to a leading number.
+ */
 export function episodeNumber(title: string): number | null {
   const value = normalize(title || '');
-  const digits = value.match(/(?:^|[^\d])(\d{1,4})(?!\d)/);
-  if (digits) return parseInt(digits[1], 10);
+
+  const patterns = [
+    /^\s*(\d{1,4})(?!\d)/,
+    /(?:الحلقة|الدرس|الجزء|الفصل|الجلسة|المحاضرة|اللقاء)\s*(\d{1,4})(?!\d)/,
+    /[»›:]\s*(\d{1,4})(?!\d)/,
+    /[-–—_]\s*(\d{1,4})(?!\d)/,
+  ];
+  for (const pattern of patterns) {
+    const match = value.match(pattern);
+    if (match) return parseInt(match[1], 10);
+  }
 
   const ordinal = Object.keys(ORDINALS).find((word) => value.includes(word));
   return ordinal ? ORDINALS[ordinal] : null;

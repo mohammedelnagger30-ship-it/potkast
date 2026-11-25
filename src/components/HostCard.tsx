@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { BadgeCheck, ExternalLink } from 'lucide-react';
+import { BadgeCheck } from 'lucide-react';
 import { OptimizedImage } from '@/components/OptimizedImage';
 import { hostPhotoUrl } from '@/lib/hostPhotos';
 import type { Host } from '@/types/podcast';
@@ -7,20 +7,16 @@ import type { Host } from '@/types/podcast';
 interface HostCardProps {
   host: Host;
   compact?: boolean;
-  /** Official public profile when the presenter has no catalogue page. */
-  externalUrl?: string;
-  /** Audit note shown on hover/tap. */
-  sourceLabel?: string;
 }
 
-export function HostCard({ host, compact = false, externalUrl, sourceLabel }: HostCardProps) {
+export function HostCard({ host, compact = false }: HostCardProps) {
   const name = host.name_ar;
   const title = host.title_ar ? `${host.title_ar} ${name}` : name;
   const photoUrl = hostPhotoUrl(host);
 
   if (compact) {
-    const body = (
-      <>
+    return (
+      <Link to={`/hosts/${host.slug}`} className="flex-shrink-0 w-32 group text-center">
         <div className="relative w-28 h-28 mx-auto mb-2">
           <div className="w-full h-full rounded-full p-[3px] bg-gradient-to-br from-primary-500 to-accent-500 group-hover:scale-105 transition-transform duration-300">
             <div className="w-full h-full rounded-full overflow-hidden bg-neutral-200 dark:bg-neutral-800">
@@ -38,38 +34,20 @@ export function HostCard({ host, compact = false, externalUrl, sourceLabel }: Ho
               <BadgeCheck size={13} />
             </span>
           )}
-          {externalUrl && (
-            <span className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-neutral-900/70 text-white flex items-center justify-center border-2 border-white dark:border-neutral-900">
-              <ExternalLink size={12} />
-            </span>
-          )}
         </div>
         <p className="text-sm font-bold text-neutral-900 dark:text-white truncate">{title}</p>
         {host.specialty_ar && (
           <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">{host.specialty_ar}</p>
         )}
-      </>
-    );
-
-    return externalUrl ? (
-      <a
-        href={externalUrl}
-        target="_blank"
-        rel="noreferrer"
-        title={sourceLabel}
-        className="flex-shrink-0 w-32 group text-center"
-      >
-        {body}
-      </a>
-    ) : (
-      <Link to={`/hosts/${host.slug}`} title={sourceLabel} className="flex-shrink-0 w-32 group text-center">
-        {body}
       </Link>
     );
   }
 
-  const body = (
-    <>
+  return (
+    <Link
+      to={`/hosts/${host.slug}`}
+      className="card-base p-5 card-hover group flex flex-col items-center text-center animate-fade-in-up"
+    >
       <div className="relative mb-3">
         <div className="w-20 h-20 rounded-full p-[3px] bg-gradient-to-br from-primary-500 to-accent-500 group-hover:scale-105 transition-transform duration-300">
           <div className="w-full h-full rounded-full overflow-hidden bg-neutral-200 dark:bg-neutral-800">
@@ -87,11 +65,6 @@ export function HostCard({ host, compact = false, externalUrl, sourceLabel }: Ho
             <BadgeCheck size={13} />
           </span>
         )}
-        {externalUrl && (
-          <span className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-neutral-900/70 text-white flex items-center justify-center border-2 border-white dark:border-neutral-900">
-            <ExternalLink size={12} />
-          </span>
-        )}
       </div>
 
       <h3 className="font-bold text-neutral-900 dark:text-white leading-snug">{title}</h3>
@@ -103,18 +76,6 @@ export function HostCard({ host, compact = false, externalUrl, sourceLabel }: Ho
       {host.country && (
         <p className="text-[11px] text-neutral-400 mt-0.5">{host.country}</p>
       )}
-    </>
-  );
-
-  const className = 'card-base p-5 card-hover group flex flex-col items-center text-center animate-fade-in-up';
-
-  return externalUrl ? (
-    <a href={externalUrl} target="_blank" rel="noreferrer" title={sourceLabel} className={className}>
-      {body}
-    </a>
-  ) : (
-    <Link to={`/hosts/${host.slug}`} title={sourceLabel} className={className}>
-      {body}
     </Link>
   );
 }

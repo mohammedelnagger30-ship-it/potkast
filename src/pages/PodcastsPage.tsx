@@ -337,19 +337,13 @@ export default function PodcastsPage() {
             <button
               key={cat.name_ar}
               onClick={() => setSelectedCategory(cat.name_ar)}
-              title={`${cat.name_ar} — ${(cat.podcast_count || 0).toLocaleString('ar-EG')} بودكاست`}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${
+              className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${
                 selectedCategory === cat.name_ar
                   ? 'bg-primary-600 text-white'
                   : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
               }`}
             >
-              <span>{cat.name_ar}</span>
-              {!!cat.podcast_count && (
-                <span className={`text-[10px] font-bold ${selectedCategory === cat.name_ar ? 'text-white/75' : 'text-neutral-400'}`}>
-                  {cat.podcast_count.toLocaleString('ar-EG')}
-                </span>
-              )}
+              {cat.name_ar}
             </button>
           ))}
         </div>
@@ -397,17 +391,13 @@ export default function PodcastsPage() {
                   <button
                     key={option.value}
                     onClick={() => setFilterLevel(option.value)}
-                    title={`${option.count} بودكاست بمستوى ${option.label}`}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                    className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
                       filterLevel === option.value
                         ? 'bg-primary-600 text-white'
                         : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
                     }`}
                   >
-                    <span>{option.label}</span>
-                    <span className={`text-[10px] font-bold ${filterLevel === option.value ? 'text-white/75' : 'text-neutral-400'}`}>
-                      {option.count.toLocaleString('ar-EG')}
-                    </span>
+                    {option.label}
                   </button>
                 ))}
               </div>
