@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -25,6 +25,8 @@ import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { DownloadButton, DownloadPodcastButton } from '@/components/DownloadButton';
 import { OptimizedImage } from '@/components/OptimizedImage';
 import { hostPhotoUrl } from '@/lib/hostPhotos';
+import { podcastCoverUrl } from '@/lib/podcastArtwork';
+import { byLatest, byOldest, byPlays, bySeries } from '@/lib/episodeOrder';
 import { supabase } from '@/lib/supabase';
 import type { Podcast, Episode, ListeningHistory } from '@/types/podcast';
 import type { EpisodeBookmark, EpisodeNote } from '@/types/features';
@@ -37,6 +39,15 @@ import {
 } from '@/types/podcast';
 
 const EPISODES_PER_PAGE = 40;
+
+type EpisodeSort = 'latest' | 'oldest' | 'series' | 'plays';
+
+const episodeSortOptions: { value: EpisodeSort; label: string }[] = [
+  { value: 'latest', label: 'الأحدث' },
+  { value: 'series', label: 'حسب الترتيب' },
+  { value: 'oldest', label: 'الأقدم' },
+  { value: 'plays', label: 'الأكثر استماعاً' },
+];
 
 // A small LRU of podcast pages makes revisits instant and keeps the last opened
 // shows readable offline. Only the first batch is stored, never the whole show.
@@ -111,6 +122,7 @@ export default function PodcastDetailPage() {
   const [bookmarkNote, setBookmarkNote] = useState('');
   const [bookmarkTime, setBookmarkTime] = useState('0:00');
   const [visibleEpisodes, setVisibleEpisodes] = useState(EPISODES_PER_PAGE);
+  const [episodeSort, setEpisodeSort] = useState<EpisodeSort>('latest');
   const [descExpanded, setDescExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -233,11 +245,20 @@ export default function PodcastDetailPage() {
     }
   }, [user, favoriteEpisodeIds]);
 
+  const orderedEpisodes = useMemo(() => {
+    const sorted = [...episodes];
+    if (episodeSort === 'series') sorted.sort(bySeries);
+    else if (episodeSort === 'oldest') sorted.sort(byOldest);
+    else if (episodeSort === 'plays') sorted.sort(byPlays);
+    else sorted.sort(byLatest);
+    return sorted;
+  }, [episodes, episodeSort]);
+
   const handlePlayEpisode = (ep: Episode) => {
     if (currentEpisode?.id === ep.id) {
       togglePlay();
     } else {
-      playEpisode(ep, podcast || undefined, episodes);
+      playEpisode(ep, podcast || undefined, orderedEpisodes);
     }
   };
 
@@ -327,7 +348,7 @@ export default function PodcastDetailPage() {
             {/* Cover */}
             <div className="flex-shrink-0">
               {(() => {
-                const cover = podcast.cover_url || hostPhotoUrl(podcast.host) || '';
+                const cover = podcastCoverUrl(podcast);
                 return cover ? (
                   <OptimizedImage
                     src={cover}
@@ -482,13 +503,30 @@ export default function PodcastDetailPage() {
             <p className="mt-0.5 text-xs text-neutral-400">استمع بترتيبك، وكمّل من حيث ما وقفت</p>
           </div>
         </div>
-        <span className="rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
-          {episodes.length} حلقة
-        </span>
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+            {episodeSortOptions.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setEpisodeSort(option.value)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                  episodeSort === option.value
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-primary-50 dark:hover:bg-primary-900/30'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <span className="rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-bold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400 whitespace-nowrap">
+            {orderedEpisodes.length} حلقة
+          </span>
+        </div>
       </div>
 
       <div className="space-y-2.5">
-        {episodes.slice(0, visibleEpisodes).map((ep, idx) => {
+        {orderedEpisodes.slice(0, visibleEpisodes).map((ep, idx) => {
           const isCurrent = currentEpisode?.id === ep.id;
           const hist = historyMap.get(ep.id);
           const isCompleted = hist?.completed;
@@ -510,7 +548,7 @@ export default function PodcastDetailPage() {
                 {/* Episode image */}
                 <div className="relative flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-neutral-200 dark:bg-neutral-800">
                   {(() => {
-                    const thumb = ep.image_url || podcast.cover_url || hostPhotoUrl(podcast.host) || '';
+                    const thumb = ep.image_url || podcastCoverUrl(podcast);
                     return thumb ? (
                       <OptimizedImage src={thumb} alt={ep.title} width={160} className="w-full h-full object-cover" />
                     ) : (
@@ -691,13 +729,13 @@ export default function PodcastDetailPage() {
         })}
       </div>
 
-      {episodes.length > visibleEpisodes && (
+      {orderedEpisodes.length > visibleEpisodes && (
         <button
           onClick={() => setVisibleEpisodes((v) => v + EPISODES_PER_PAGE)}
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-primary-200 bg-primary-50/60 py-3 text-sm font-bold text-primary-700 transition-all hover:border-primary-400 hover:bg-primary-100 dark:border-primary-900 dark:bg-primary-950/20 dark:text-primary-300 dark:hover:bg-primary-900/30"
         >
           <ChevronDown size={16} />
-          عرض المزيد ({episodes.length - visibleEpisodes} حلقة متبقية)
+          عرض المزيد ({orderedEpisodes.length - visibleEpisodes} حلقة متبقية)
         </button>
       )}
 

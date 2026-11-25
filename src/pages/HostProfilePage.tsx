@@ -21,6 +21,8 @@ import { PodcastCard } from '@/components/PodcastCard';
 import { DownloadButton } from '@/components/DownloadButton';
 import { OptimizedImage } from '@/components/OptimizedImage';
 import { hostPhotoUrl } from '@/lib/hostPhotos';
+import { podcastCoverUrl } from '@/lib/podcastArtwork';
+import { bySeries } from '@/lib/episodeOrder';
 import { useAuth } from '@/context/AuthContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { useProgress } from '@/context/ProgressContext';
@@ -28,7 +30,7 @@ import { supabase } from '@/lib/supabase';
 import type { Host, Podcast, Episode } from '@/types/podcast';
 import { formatCount, formatDuration, formatRelativeTime } from '@/types/podcast';
 
-type FlatTab = 'latest' | 'top';
+type FlatTab = 'latest' | 'top' | 'series';
 type EpisodeWithPod = Episode & { podcast?: Podcast };
 type PodcastWithCount = Podcast & { episodes_count?: number };
 
@@ -87,6 +89,7 @@ export default function HostProfilePage() {
   const [flat, setFlat] = useState<Record<FlatTab, ListState>>({
     latest: { items: [], hasMore: true, loading: false },
     top: { items: [], hasMore: true, loading: false },
+    series: { items: [], hasMore: true, loading: false },
   });
 
   const podMap = useMemo(() => new Map(podcasts.map((p) => [p.id, p])), [podcasts]);
@@ -123,6 +126,9 @@ export default function HostProfilePage() {
       const pods = ((podData || []) as unknown as (PodcastWithCount & { episodes?: { count: number }[] })[]).map(
         ({ episodes: counted, ...rest }) => ({ ...rest, episodes_count: counted?.[0]?.count ?? 0 })
       );
+      // Largest courses first makes both the summaries and the course grid
+      // predictable instead of following import timestamps.
+      pods.sort((a, b) => (b.episodes_count || 0) - (a.episodes_count || 0) || a.title.localeCompare(b.title, 'ar'));
       const map = new Map(pods.map((p) => [p.id, p]));
       const ids = pods.map((p) => p.id);
       const total = pods.reduce((sum, p) => sum + (p.episodes_count || 0), 0);
@@ -138,6 +144,7 @@ export default function HostProfilePage() {
       setFlat({
         latest: { items: [], hasMore: true, loading: true },
         top: { items: [], hasMore: true, loading: false },
+        series: { items: [], hasMore: true, loading: false },
       });
       setLoading(false);
 
@@ -156,6 +163,7 @@ export default function HostProfilePage() {
         setFlat({
           latest: { items: latestItems, hasMore: latestItems.length === PAGE_SIZE, loading: false },
           top: { items: [], hasMore: true, loading: false },
+          series: { items: [], hasMore: true, loading: false },
         });
 
         if (user) {
@@ -206,13 +214,13 @@ export default function HostProfilePage() {
 
   // Load absolutely every episode of this host, including 4-hour ones.
   // No duration or count filtering is applied here.
-  const loadAll = useCallback(async () => {
+  const loadAllFor = useCallback(async (key: FlatTab = sort) => {
     if (loadingAll) return;
-    const state = flat[sort];
+    const state = flat[key];
     if (state.loading || !state.hasMore) return;
     setLoadingAll(true);
 
-    const order = sort === 'top' ? 'plays_count' : 'published_at';
+    const order = key === 'top' ? 'plays_count' : 'published_at';
     let items = [...state.items];
     let offset = items.length;
 
@@ -230,17 +238,21 @@ export default function HostProfilePage() {
         offset += data.length;
         if (data.length < BULK_PAGE_SIZE) break;
       }
-      setFlat((prev) => ({ ...prev, [sort]: { items, hasMore: false, loading: false } }));
+      setFlat((prev) => ({ ...prev, [key]: { items, hasMore: false, loading: false } }));
     } finally {
       setLoadingAll(false);
     }
   }, [flat, sort, loadingAll, podIds, podMap]);
 
+  const loadAll = useCallback(() => loadAllFor(sort), [loadAllFor, sort]);
+
   const changeSort = (next: FlatTab) => {
     if (next === sort) return;
     setSort(next);
     if (flat[next].items.length === 0 && !flat[next].loading && flat[next].hasMore) {
-      loadFlat(next);
+      // Grouped view needs the whole catalogue to organise it by course.
+      if (next === 'series') void loadAllFor('series');
+      else loadFlat(next);
     }
   };
 
@@ -265,9 +277,17 @@ export default function HostProfilePage() {
 
   const totalPlays = podcasts.reduce((sum, p) => sum + (p.plays_count || 0), 0);
   const currentList = flat[sort];
+  const displayItems = useMemo(
+    () => (sort === 'series' ? [...currentList.items].sort(bySeries) : currentList.items),
+    [sort, currentList.items]
+  );
+  const displayList = useMemo(
+    () => ({ ...currentList, items: displayItems }),
+    [currentList, displayItems]
+  );
 
   const handlePlayAll = () => {
-    const queue = currentList.items;
+    const queue = displayItems;
     if (queue.length === 0) return;
     if (currentEpisode && queue.some((e) => e.id === currentEpisode.id)) {
       togglePlay();
@@ -530,11 +550,21 @@ export default function HostProfilePage() {
             >
               الأكثر استماعاً
             </button>
+            <button
+              onClick={() => changeSort('series')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                sort === 'series'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-primary-50 dark:hover:bg-primary-900/30'
+              }`}
+            >
+              حسب الدورة
+            </button>
           </div>
         </div>
 
         <FlatEpisodeList
-          state={currentList}
+          state={displayList}
           onLoadMore={() => loadFlat(sort)}
           onLoadAll={loadAll}
           loadingAll={loadingAll}
@@ -543,6 +573,7 @@ export default function HostProfilePage() {
           currentEpisodeId={currentEpisode?.id}
           isPlaying={isPlaying}
           showPlays={sort === 'top'}
+          groupByPodcast={sort === 'series'}
         />
       </section>
     </Layout>
@@ -568,9 +599,7 @@ function SummaryCard({ podcast }: { podcast: PodcastWithCount }) {
   return (
     <div className="card-base p-4 flex flex-col gap-3">
       <div className="flex items-start gap-3">
-        {podcast.cover_url && (
-          <OptimizedImage src={podcast.cover_url} alt="" width={96} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
-        )}
+        <OptimizedImage src={podcastCoverUrl(podcast)} alt="" width={96} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
         <div className="min-w-0 flex-1">
           <Link
             to={`/podcasts/${podcast.id}`}
@@ -620,6 +649,7 @@ function FlatEpisodeList({
   currentEpisodeId,
   isPlaying,
   showPlays = false,
+  groupByPodcast = false,
 }: {
   state: ListState;
   onLoadMore: () => void;
@@ -630,6 +660,7 @@ function FlatEpisodeList({
   currentEpisodeId?: string;
   isPlaying: boolean;
   showPlays?: boolean;
+  groupByPodcast?: boolean;
 }) {
   if (state.items.length === 0) {
     return state.loading ? (
@@ -641,20 +672,68 @@ function FlatEpisodeList({
     );
   }
 
+  const groups = new Map<string, { id: string; title: string; items: EpisodeWithPod[] }>();
+  if (groupByPodcast) {
+    state.items.forEach((ep) => {
+      const key = ep.podcast_id || 'other';
+      const group = groups.get(key) || {
+        id: key,
+        title: ep.podcast?.title || 'حلقات أخرى',
+        items: [],
+      };
+      group.items.push(ep);
+      groups.set(key, group);
+    });
+  }
+  const orderedGroups = [...groups.values()].sort(
+    (a, b) => b.items.length - a.items.length || a.title.localeCompare(b.title, 'ar')
+  );
+
   return (
     <div>
-      <div className="space-y-2">
-        {state.items.map((ep) => (
-          <EpisodeRow
-            key={ep.id}
-            ep={ep}
-            onPlay={() => onPlay(ep, state.items)}
-            isCurrent={currentEpisodeId === ep.id}
-            isPlaying={isPlaying}
-            showPlays={showPlays}
-          />
-        ))}
-      </div>
+      {groupByPodcast ? (
+        <div className="space-y-7">
+          {orderedGroups.map((group) => (
+            <section key={group.id}>
+              <div className="mb-2 flex items-center justify-between gap-2 border-b border-neutral-200 pb-2 dark:border-neutral-700">
+                <h4 className="min-w-0 truncate text-sm font-extrabold text-neutral-800 dark:text-neutral-100">
+                  {group.title}
+                </h4>
+                <span className="whitespace-nowrap rounded-full bg-primary-50 px-2.5 py-1 text-[11px] font-bold text-primary-600 dark:bg-primary-900/30 dark:text-primary-400">
+                  {group.items.length} حلقة
+                </span>
+              </div>
+              <div className="space-y-2">
+                {group.items.map((ep, index) => (
+                  <EpisodeRow
+                    key={ep.id}
+                    ep={ep}
+                    number={index + 1}
+                    onPlay={() => onPlay(ep, group.items)}
+                    isCurrent={currentEpisodeId === ep.id}
+                    isPlaying={isPlaying}
+                    showPlays={showPlays}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {state.items.map((ep, index) => (
+            <EpisodeRow
+              key={ep.id}
+              ep={ep}
+              number={index + 1}
+              onPlay={() => onPlay(ep, state.items)}
+              isCurrent={currentEpisodeId === ep.id}
+              isPlaying={isPlaying}
+              showPlays={showPlays}
+            />
+          ))}
+        </div>
+      )}
       {state.hasMore && (
         <div className="mt-3 flex flex-col sm:flex-row gap-2">
           <button
@@ -690,15 +769,22 @@ function EpisodeRow({
   isCurrent,
   isPlaying,
   showPlays = false,
+  number,
 }: {
   ep: Episode & { podcast?: Podcast };
   onPlay: (ep: Episode & { podcast?: Podcast }) => void;
   isCurrent: boolean;
   isPlaying: boolean;
   showPlays?: boolean;
+  number?: number;
 }) {
   return (
     <div className={`card-base p-4 flex items-center gap-4 transition-all ${isCurrent ? 'ring-2 ring-primary-500' : ''}`}>
+      {number !== undefined && (
+        <span className="w-6 flex-shrink-0 text-center text-xs font-extrabold text-neutral-400">
+          {number.toLocaleString('ar-EG')}
+        </span>
+      )}
       <button
         onClick={() => onPlay(ep)}
         disabled={!ep.audio_url}

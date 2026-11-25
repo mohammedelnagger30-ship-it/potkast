@@ -7,7 +7,7 @@ import { loadQuickPlayIndex, quickEpisodeFor, rememberEpisodes } from '@/lib/qui
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { Badge } from '@/components/ui';
 import { OptimizedImage } from '@/components/OptimizedImage';
-import { hostPhotoUrl } from '@/lib/hostPhotos';
+import { podcastCoverUrl } from '@/lib/podcastArtwork';
 import { typeLabels, levelLabels } from '@/types/podcast';
 
 interface PodcastCardProps {
@@ -100,7 +100,7 @@ export function PodcastCard({ podcast, onToggleFavorite, compact = false }: Podc
 
   const hostLink = podcast.host?.slug ? `/hosts/${podcast.host.slug}` : null;
   const hostName = podcast.host?.name_ar || podcast.host_name;
-  const coverUrl = podcast.cover_url || hostPhotoUrl(podcast.host) || '';
+  const coverUrl = podcastCoverUrl(podcast);
 
   // The whole card is already a <Link>; nesting another <a> inside it is
   // invalid HTML, so navigate in JS from a span that looks like a link.

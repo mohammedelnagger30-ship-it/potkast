@@ -23,6 +23,7 @@ import { DownloadButton } from '@/components/DownloadButton';
 import { OptimizedImage } from '@/components/OptimizedImage';
 import { supabase } from '@/lib/supabase';
 import { formatTime, formatDuration } from '@/types/podcast';
+import { podcastCoverUrl } from '@/lib/podcastArtwork';
 
 const speedOptions = [0.75, 1, 1.25, 1.5, 2];
 
@@ -106,7 +107,8 @@ export default function PlayerPage() {
 
   const total = duration > 0 ? duration : currentEpisode.duration_seconds || 0;
   const nextEpisodes = queue.slice(queueIndex + 1, queueIndex + 6);
-  const coverUrl = currentPodcast?.cover_url || currentEpisode.podcast?.cover_url || '';
+  const coverSource = currentPodcast || currentEpisode.podcast;
+  const coverUrl = coverSource ? podcastCoverUrl(coverSource) : '';
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-primary-50 via-white to-neutral-50 dark:from-neutral-900 dark:via-neutral-950 dark:to-neutral-950">

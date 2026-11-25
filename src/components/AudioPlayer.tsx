@@ -18,6 +18,7 @@ import {
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { OptimizedImage } from '@/components/OptimizedImage';
 import { formatTime } from '@/types/podcast';
+import { podcastCoverUrl } from '@/lib/podcastArtwork';
 
 const speedOptions = [0.75, 1, 1.25, 1.5, 2];
 
@@ -56,7 +57,7 @@ export function AudioPlayer() {
   if (!currentEpisode) return null;
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
-  const coverUrl = currentPodcast?.cover_url || '';
+  const coverUrl = currentPodcast ? podcastCoverUrl(currentPodcast) : '';
   const podcastTitle = currentPodcast?.title || '';
   const host = currentPodcast?.host;
 

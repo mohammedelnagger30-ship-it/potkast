@@ -16,6 +16,7 @@ import { typeLabels, levelLabels, interestToCategoryMap } from '@/types/podcast'
 
 type FilterType = 'all' | 'religious' | 'scientific' | 'cultural' | 'motivational' | 'professional' | 'comedy' | 'leadership' | 'communication' | 'improv';
 type FilterLevel = 'all' | 'beginner' | 'intermediate' | 'expert';
+type CategoryWithCount = Category & { podcast_count?: number };
 
 const PAGE_SIZE = 24;
 
@@ -27,7 +28,9 @@ export default function PodcastsPage() {
   // in the background. The first visit is unchanged; every revisit is instant.
   const cachedCatalog = useRef(readCatalogCache()).current;
   const [allPodcasts, setAllPodcasts] = useState<Podcast[]>(cachedCatalog?.podcasts || []);
-  const [categories, setCategories] = useState<Category[]>(cachedCatalog?.categories || []);
+  const [categories, setCategories] = useState<CategoryWithCount[]>(
+    (cachedCatalog?.categories || []) as CategoryWithCount[]
+  );
   const [continueEpisodes, setContinueEpisodes] = useState<(Episode & { podcast?: Podcast })[]>([]);
   const [loading, setLoading] = useState(!cachedCatalog);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -45,6 +48,28 @@ export default function PodcastsPage() {
     setVisibleCount(PAGE_SIZE);
   }, [searchQuery, selectedCategory, filterType, filterLevel]);
 
+  // A horizontal chip row in an RTL page does not respond to a normal mouse
+  // wheel. Translate vertical wheel movement into horizontal scrolling, while
+  // still letting the page scroll once either end is reached.
+  const categoryStripRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const strip = categoryStripRef.current;
+    if (!strip) return;
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+      const maxScroll = strip.scrollWidth - strip.clientWidth;
+      if (maxScroll <= 1) return;
+      const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
+      const atStart = strip.scrollLeft >= -1 && delta < 0;
+      const atEnd = strip.scrollLeft <= -maxScroll + 1 && delta > 0;
+      if (atStart || atEnd) return;
+      event.preventDefault();
+      strip.scrollLeft -= delta;
+    };
+    strip.addEventListener('wheel', onWheel, { passive: false });
+    return () => strip.removeEventListener('wheel', onWheel);
+  }, []);
+
   const fetchPodcasts = useCallback(async () => {
     const [{ data: podcastsData }, { data: categoriesData }, { data: favData }] = await Promise.all([
       // Only card/filter fields — pulling every long description for 766 shows
@@ -53,13 +78,19 @@ export default function PodcastsPage() {
         .from('podcasts')
         .select('id,title,cover_url,type,audience_level,host_name,created_at,category_id,host_id,category:categories(name_ar),host:hosts(id,name_ar,slug,is_verified,photo_url)')
         .order('created_at', { ascending: false }),
-      supabase.from('categories').select('*').order('name_ar'),
+      supabase.from('categories').select('*, podcasts(count)').order('name_ar'),
       user ? supabase.from('favorites').select('podcast_id').eq('user_id', user.id) : Promise.resolve({ data: null }),
     ]);
 
     const favSet = new Set<string>();
     (favData || []).forEach((f: { podcast_id: string }) => favSet.add(f.podcast_id));
     setFavorites(favSet);
+
+    const mappedCategories = ((categoriesData || []) as unknown as (CategoryWithCount & { podcasts?: { count: number }[] })[])
+      .map(({ podcasts, ...category }) => ({
+        ...category,
+        podcast_count: podcasts?.[0]?.count ?? 0,
+      }));
 
     if (podcastsData) {
       const enriched = (podcastsData as Record<string, unknown>[]).map((p) => ({
@@ -74,9 +105,9 @@ export default function PodcastsPage() {
         delete raw.is_favorited;
         return raw;
       });
-      writeCatalogCache(rawPodcasts, (categoriesData || []) as Category[]);
+      writeCatalogCache(rawPodcasts, mappedCategories);
     }
-    if (categoriesData) setCategories(categoriesData as Category[]);
+    if (categoriesData) setCategories(mappedCategories);
     setLoading(false);
   }, [user]);
 
@@ -129,16 +160,23 @@ export default function PodcastsPage() {
     }
   }, [user, favorites]);
 
-  // The DB currently holds 5 rows per category name (repeated seeds).
-  // Show each name once and keep it working regardless of which duplicate id
-  // a podcast points at.
+  // The DB holds several rows per category name. Merge the duplicates, then
+  // show the richest categories first — a useful order that stays correct as
+  // the catalog grows instead of an arbitrary alphabetical list.
   const categoryOptions = useMemo(() => {
-    const seen = new Set<string>();
-    return categories.filter((c) => {
-      if (!c.name_ar || seen.has(c.name_ar)) return false;
-      seen.add(c.name_ar);
-      return true;
+    const merged = new Map<string, CategoryWithCount>();
+    categories.forEach((category) => {
+      if (!category.name_ar) return;
+      const existing = merged.get(category.name_ar);
+      if (existing) {
+        existing.podcast_count = (existing.podcast_count || 0) + (category.podcast_count || 0);
+      } else {
+        merged.set(category.name_ar, { ...category });
+      }
     });
+    return [...merged.values()].sort(
+      (a, b) => (b.podcast_count || 0) - (a.podcast_count || 0) || a.name_ar.localeCompare(b.name_ar, 'ar')
+    );
   }, [categories]);
 
   // Filtered podcasts for search/grid view
@@ -231,7 +269,7 @@ export default function PodcastsPage() {
 
       {/* Category chips + filter toggle */}
       <div className="flex items-center gap-2 mb-4">
-        <div className="flex-1 flex gap-2 overflow-x-auto no-scrollbar">
+        <div ref={categoryStripRef} className="flex-1 flex gap-2 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setSelectedCategory('all')}
             className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${
@@ -246,13 +284,19 @@ export default function PodcastsPage() {
             <button
               key={cat.name_ar}
               onClick={() => setSelectedCategory(cat.name_ar)}
-              className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${
+              title={`${cat.name_ar} — ${(cat.podcast_count || 0).toLocaleString('ar-EG')} بودكاست`}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${
                 selectedCategory === cat.name_ar
                   ? 'bg-primary-600 text-white'
                   : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
               }`}
             >
-              {cat.name_ar}
+              <span>{cat.name_ar}</span>
+              {!!cat.podcast_count && (
+                <span className={`text-[10px] font-bold ${selectedCategory === cat.name_ar ? 'text-white/75' : 'text-neutral-400'}`}>
+                  {cat.podcast_count.toLocaleString('ar-EG')}
+                </span>
+              )}
             </button>
           ))}
         </div>
