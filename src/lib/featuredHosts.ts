@@ -60,7 +60,7 @@ export const FEATURED_HOSTS: FeaturedPerson[] = [
     name: 'د. أحمد عبد المنعم',
     title: 'باحث ومقدم',
     specialty: 'تفسير القرآن والتزكية',
-    photo: 'https://i1.sndcdn.com/avatars-000038390708-0tx7sk-t500x500.jpg',
+    photo: 'https://unavatar.io/x/A_Abdelmonem82',
     slug: 'ahmed-abdelmoneim',
   },
   {
