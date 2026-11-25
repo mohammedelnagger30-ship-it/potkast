@@ -14,6 +14,7 @@ import {
   Globe,
   BookOpen,
   ExternalLink,
+  Send,
   UserPlus,
   UserCheck,
 } from 'lucide-react';
@@ -34,6 +35,19 @@ import {
   ahmedCourseForEpisode,
   type AhmedCourse,
 } from '@/lib/ahmedArabi';
+import {
+  BASEL_MOUNES_ARCHIVE_URL,
+  BASEL_MOUNES_COURSES,
+  BASEL_MOUNES_EPISODES,
+  BASEL_MOUNES_HOST,
+  BASEL_MOUNES_QURAN_EPISODES,
+  BASEL_MOUNES_QURAN_PODCAST,
+  BASEL_MOUNES_QURAN_RECITATIONS,
+  BASEL_MOUNES_SLUG,
+  BASEL_MOUNES_SOLO_TITLE,
+  baselCourseForEpisode,
+  type BaselCourse,
+} from '@/lib/baselMounes';
 import { useAuth } from '@/context/AuthContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { useProgress } from '@/context/ProgressContext';
@@ -43,7 +57,6 @@ import {
   AHMED_QURAN_PODCAST,
   AHMED_QURAN_RECITATIONS,
   AHMED_QURAN_SOURCE_URL,
-  isQuranRecitationId,
 } from '@/lib/ahmedArabiQuran';
 import type { Host, Podcast, Episode } from '@/types/podcast';
 import { formatCount, formatDuration, formatRelativeTime } from '@/types/podcast';
@@ -51,6 +64,7 @@ import { formatCount, formatDuration, formatRelativeTime } from '@/types/podcast
 type FlatTab = 'latest' | 'top' | 'series';
 type EpisodeWithPod = Episode & { podcast?: Podcast; courseTitle?: string };
 type PodcastWithCount = Podcast & { episodes_count?: number };
+type PresenterCourse = AhmedCourse | BaselCourse;
 
 interface ListState {
   items: EpisodeWithPod[];
@@ -72,6 +86,7 @@ const socialIcons: Record<string, typeof Youtube> = {
   twitter: Twitter,
   instagram: Instagram,
   website: Globe,
+  telegram: Send,
   quran: BookOpen,
 };
 
@@ -121,6 +136,22 @@ export default function HostProfilePage() {
   });
 
   const hostIsAhmed = host?.slug === AHMED_ARABI_SLUG;
+  const hostIsBasel = host?.slug === BASEL_MOUNES_SLUG;
+  const hostIsCurated = hostIsAhmed || hostIsBasel;
+  const presenterCourses: PresenterCourse[] = hostIsBasel ? BASEL_MOUNES_COURSES : AHMED_ARABI_COURSES;
+  const presenterSoloTitle = hostIsBasel ? BASEL_MOUNES_SOLO_TITLE : AHMED_ARABI_SOLO_TITLE;
+  const quranEpisodes = hostIsBasel ? BASEL_MOUNES_QURAN_EPISODES : AHMED_QURAN_EPISODES;
+  const quranPodcast = hostIsBasel ? BASEL_MOUNES_QURAN_PODCAST : AHMED_QURAN_PODCAST;
+  const quranSourceUrl = hostIsBasel ? BASEL_MOUNES_ARCHIVE_URL : AHMED_QURAN_SOURCE_URL;
+  const quranSourceLabel = hostIsBasel ? 'Internet Archive' : 'الطريق إلى القرآن';
+  const quranEditionLabel = hostIsBasel ? 'مصحف مرتل' : 'حفص عن عاصم';
+  const quranRecitations = hostIsBasel
+    ? BASEL_MOUNES_QURAN_RECITATIONS
+    : AHMED_QURAN_RECITATIONS;
+  const quranNote = hostIsBasel
+    ? `السور المتاحة بصوت م. باسل مؤنس — منفصلة عن دروسه، وغير داخل عدّاد الحلقات. ${BASEL_MOUNES_QURAN_RECITATIONS.length} سورة من أصل ١١٤؛ لا تُكمل بالفجوات من قارئ آخر.`
+    : 'السور المتاحة بصوت د. أحمد العربي — منفصلة عن حلقات فاهم وبدون ورق، وغير داخل عدّاد الحلقات.';
+  const reciterName = hostIsBasel ? 'م. باسل مؤنس' : 'د. أحمد العربي';
   const podMap = useMemo(() => new Map(podcasts.map((p) => [p.id, p])), [podcasts]);
   const podIds = useMemo(() => podcasts.map((p) => p.id), [podcasts]);
 
@@ -139,16 +170,24 @@ export default function HostProfilePage() {
         .eq('slug', resolvedSlug)
         .maybeSingle();
 
-      // د. أحمد العربي presents his series inside فاهم / بدون ورق, so the
-      // database has no podcasts owned by him yet. Keep his verified profile
-      // usable until the SQL migration is run in Supabase.
-      const hostRow = (hostData as Host | null) || (resolvedSlug === AHMED_ARABI_SLUG ? AHMED_ARABI_HOST : null);
+      // Both curated presenters must stay usable before/without database rows:
+      // Ahmed's series live inside other shows, and Basel's verified audio is
+      // published on public archives rather than as Sada podcasts.
+      const fallbackHost =
+        resolvedSlug === AHMED_ARABI_SLUG
+          ? AHMED_ARABI_HOST
+          : resolvedSlug === BASEL_MOUNES_SLUG
+            ? BASEL_MOUNES_HOST
+            : null;
+      const hostRow = (hostData as Host | null) || fallbackHost;
       const hasDatabaseHost = !!hostData;
       if (!hostRow) {
         if (!cancelled) setLoading(false);
         return;
       }
       const isAhmed = hostRow.slug === AHMED_ARABI_SLUG;
+      const isBasel = hostRow.slug === BASEL_MOUNES_SLUG;
+      const isCurated = isAhmed || isBasel;
       // The curated list works before the SQL migration is applied. Once the
       // episode_credits table exists, it becomes the source of truth and can
       // include future verified appearances without another app release.
@@ -175,7 +214,7 @@ export default function HostProfilePage() {
         }
       }
 
-      if (!isAhmed) {
+      if (!isCurated) {
         // Every podcast of this host, each with its real episode count.
         const { data: podData } = await supabase
           .from('podcasts')
@@ -194,7 +233,7 @@ export default function HostProfilePage() {
         ids = pods.map((p) => p.id);
         total = pods.reduce((sum, p) => sum + (p.episodes_count || 0), 0);
       } else {
-        total = ahmedIds.length;
+        total = isAhmed ? ahmedIds.length : BASEL_MOUNES_EPISODES.length;
       }
 
       if (cancelled) return;
@@ -229,6 +268,13 @@ export default function HostProfilePage() {
             courseTitle: ahmedCourseForEpisode(ep.id),
           }));
           firstItems.sort((a, b) => ahmedIds.indexOf(a.id) - ahmedIds.indexOf(b.id));
+        } else if (isBasel) {
+          // Every distinct, source-labelled talk; exact archive duplicates and
+          // files about other presenters are left out of the curated module.
+          firstItems = BASEL_MOUNES_EPISODES.map((ep) => ({
+            ...ep,
+            courseTitle: baselCourseForEpisode(ep.id),
+          }));
         } else if (ids.length > 0) {
           const { data: epData } = await supabase
             .from('episodes')
@@ -240,13 +286,13 @@ export default function HostProfilePage() {
         }
         if (cancelled) return;
         setFlat({
-          latest: isAhmed
+          latest: isCurated
             ? { items: [...firstItems].sort(byLatest), hasMore: false, loading: false }
             : { items: [], hasMore: true, loading: false },
-          top: isAhmed
+          top: isCurated
             ? { items: [...firstItems].sort(byPlays), hasMore: false, loading: false }
             : { items: [], hasMore: true, loading: false },
-          series: { items: firstItems, hasMore: !isAhmed && firstItems.length === PAGE_SIZE, loading: false },
+          series: { items: firstItems, hasMore: !isCurated && firstItems.length === PAGE_SIZE, loading: false },
         });
 
         if (user) {
@@ -362,14 +408,14 @@ export default function HostProfilePage() {
     setFollowBusy(false);
   }, [user, host, isFollowing, followBusy]);
 
-  const courses = hostIsAhmed ? AHMED_ARABI_COURSES : [];
-  const totalPlays = hostIsAhmed
+  const courses = hostIsCurated ? presenterCourses : [];
+  const totalPlays = hostIsCurated
     ? flat.series.items.reduce((sum, ep) => sum + (ep.plays_count || 0), 0)
     : podcasts.reduce((sum, p) => sum + (p.plays_count || 0), 0);
   const currentList = flat[sort];
   const displayItems = useMemo(
-    () => (sort === 'series' && !hostIsAhmed ? [...currentList.items].sort(bySeries) : currentList.items),
-    [sort, hostIsAhmed, currentList.items]
+    () => (sort === 'series' && !hostIsCurated ? [...currentList.items].sort(bySeries) : currentList.items),
+    [sort, hostIsCurated, currentList.items]
   );
   const displayList = useMemo(
     () => ({ ...currentList, items: displayItems }),
@@ -395,10 +441,10 @@ export default function HostProfilePage() {
   };
 
   const handlePlayQuran = () => {
-    if (isQuranRecitationId(currentEpisode?.id)) {
+    if (quranEpisodes.some((episode) => episode.id === currentEpisode?.id)) {
       togglePlay();
     } else {
-      playEpisode(AHMED_QURAN_EPISODES[0], AHMED_QURAN_PODCAST, AHMED_QURAN_EPISODES);
+      playEpisode(quranEpisodes[0], quranPodcast, quranEpisodes);
     }
   };
 
@@ -406,7 +452,7 @@ export default function HostProfilePage() {
     if (currentEpisode?.id === episode.id) {
       togglePlay();
     } else {
-      playEpisode(episode, AHMED_QURAN_PODCAST, AHMED_QURAN_EPISODES);
+      playEpisode(episode, quranPodcast, quranEpisodes);
     }
   };
 
@@ -519,13 +565,13 @@ export default function HostProfilePage() {
           </div>
 
           {/* Stats row */}
-          <div className={`grid gap-2 mt-5 ${hostIsAhmed ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-4'}`}>
+          <div className={`grid gap-2 mt-5 ${hostIsCurated ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-4'}`}>
             {[
               { icon: Users, value: formatCount(host.followers_count), label: 'متابع' },
-              { icon: Mic, value: (hostIsAhmed ? courses.length : podcasts.length).toString(), label: hostIsAhmed ? 'دورات' : 'بودكاست' },
+              { icon: Mic, value: (hostIsCurated ? courses.length : podcasts.length).toString(), label: hostIsCurated ? 'دورات' : 'بودكاست' },
               { icon: Headphones, value: totalEpisodes.toString(), label: 'حلقة' },
-              ...(hostIsAhmed
-                ? [{ icon: BookOpen, value: AHMED_QURAN_EPISODES.length.toLocaleString('ar-EG'), label: 'تلاوة' }]
+              ...(hostIsCurated
+                ? [{ icon: BookOpen, value: quranEpisodes.length.toLocaleString('ar-EG'), label: 'تلاوة' }]
                 : []),
               { icon: Play, value: formatCount(totalPlays), label: 'تشغيل' },
             ].map((s, i) => (
@@ -589,10 +635,15 @@ export default function HostProfilePage() {
         </div>
       </div>
 
-      {hostIsAhmed && (
+      {hostIsCurated && (
         <QuranRecitationsSection
-          episodes={AHMED_QURAN_EPISODES}
-          sourceUrl={AHMED_QURAN_SOURCE_URL}
+          episodes={quranEpisodes}
+          recitations={quranRecitations}
+          reciterName={reciterName}
+          note={quranNote}
+          sourceUrl={quranSourceUrl}
+          sourceLabel={quranSourceLabel}
+          editionLabel={quranEditionLabel}
           currentEpisodeId={currentEpisode?.id}
           isPlaying={isPlaying}
           onPlayAll={handlePlayQuran}
@@ -609,16 +660,16 @@ export default function HostProfilePage() {
               لمحة سريعة عن كل دورة من دورات {name}، من الوصف الأصلي للبودكاست.
             </p>
           </div>
-          <Badge variant="neutral" size="sm">{(hostIsAhmed ? courses : podcasts).length} ملخص</Badge>
+          <Badge variant="neutral" size="sm">{(hostIsCurated ? courses : podcasts).length} ملخص</Badge>
         </div>
 
-        {hostIsAhmed ? (
+        {hostIsCurated ? (
           courses.length === 0 ? (
             <EmptyState text="لا توجد موجزات لهذا المقدم بعد" />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {courses.map((course) => (
-                <AhmedCourseCard
+                <CuratedCourseCard
                   key={course.key}
                   course={course}
                   episodes={flat.series.items.filter((ep) => ep.courseTitle === course.title)}
@@ -651,16 +702,16 @@ export default function HostProfilePage() {
 
         <div className="flex items-center justify-between gap-3 mb-3">
           <h3 className="font-extrabold text-neutral-800 dark:text-neutral-200">
-            كل الدورات ({(hostIsAhmed ? courses : podcasts).length})
+            كل الدورات ({(hostIsCurated ? courses : podcasts).length})
           </h3>
         </div>
-        {hostIsAhmed ? (
+        {hostIsCurated ? (
           courses.length === 0 ? (
             <EmptyState text="لا توجد دورات لهذا المقدم بعد" />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {courses.map((course) => (
-                <AhmedCourseCard
+                <CuratedCourseCard
                   key={course.key}
                   course={course}
                   episodes={flat.series.items.filter((ep) => ep.courseTitle === course.title)}
@@ -731,7 +782,9 @@ export default function HostProfilePage() {
           isPlaying={isPlaying}
           showPlays={sort === 'top'}
           groupByPodcast={sort === 'series'}
-          groupByCourse={hostIsAhmed && sort === 'series'}
+          groupByCourse={hostIsCurated && sort === 'series'}
+          courseOrder={presenterCourses.map((course) => course.title)}
+          soloTitle={presenterSoloTitle}
         />
       </section>
     </Layout>
@@ -751,22 +804,32 @@ function EmptyState({ text }: { text: string }) {
 
 function QuranRecitationsSection({
   episodes,
+  recitations,
+  reciterName,
+  note,
   sourceUrl,
+  sourceLabel,
+  editionLabel,
   currentEpisodeId,
   isPlaying,
   onPlayAll,
   onPlay,
 }: {
   episodes: Episode[];
+  recitations: Array<{ id: string; surahNumber: number }>;
+  reciterName: string;
+  note: string;
   sourceUrl: string;
+  sourceLabel: string;
+  editionLabel: string;
   currentEpisodeId?: string;
   isPlaying: boolean;
   onPlayAll: () => void;
   onPlay: (episode: Episode) => void;
 }) {
   const surahNumbers = useMemo(
-    () => new Map(AHMED_QURAN_RECITATIONS.map((item) => [item.id, item.surahNumber])),
-    []
+    () => new Map(recitations.map((item) => [item.id, item.surahNumber])),
+    [recitations]
   );
   const wholeQueuePlaying = episodes.some((episode) => episode.id === currentEpisodeId) && isPlaying;
 
@@ -780,13 +843,11 @@ function QuranRecitationsSection({
             </div>
             <div className="min-w-0">
               <h2 className="text-lg lg:text-xl font-extrabold text-neutral-900 dark:text-white">تلاوة القرآن</h2>
-              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-                السور المتاحة بصوت د. أحمد العربي — منفصلة عن حلقات فاهم وبدون ورق، وغير داخل عدّاد الحلقات.
-              </p>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">{note}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="neutral" size="sm">حفص عن عاصم</Badge>
+            <Badge variant="neutral" size="sm">{editionLabel}</Badge>
             <button
               onClick={onPlayAll}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm bg-accent-500 text-white hover:bg-accent-600 transition-all active:scale-95"
@@ -805,7 +866,7 @@ function QuranRecitationsSection({
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:underline"
           >
-            المصدر: الطريق إلى القرآن <ExternalLink size={12} />
+            المصدر: {sourceLabel} <ExternalLink size={12} />
           </a>
         </div>
 
@@ -840,7 +901,7 @@ function QuranRecitationsSection({
                 </button>
                 <div className="min-w-0 flex-1">
                   <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 truncate">{episode.title}</h3>
-                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">تلاوة بصوت د. أحمد العربي</p>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">تلاوة بصوت {reciterName}</p>
                 </div>
                 <Badge variant="neutral" size="sm" className="flex-shrink-0">MP3</Badge>
               </div>
@@ -852,12 +913,12 @@ function QuranRecitationsSection({
   );
 }
 
-function AhmedCourseCard({
+function CuratedCourseCard({
   course,
   episodes,
   onPlay,
 }: {
-  course: AhmedCourse;
+  course: PresenterCourse;
   episodes: EpisodeWithPod[];
   onPlay: (episodes: EpisodeWithPod[]) => void;
 }) {
@@ -962,6 +1023,8 @@ function FlatEpisodeList({
   showPlays = false,
   groupByPodcast = false,
   groupByCourse = false,
+  courseOrder = [],
+  soloTitle = AHMED_ARABI_SOLO_TITLE,
 }: {
   state: ListState;
   onLoadMore: () => void;
@@ -974,6 +1037,8 @@ function FlatEpisodeList({
   showPlays?: boolean;
   groupByPodcast?: boolean;
   groupByCourse?: boolean;
+  courseOrder?: string[];
+  soloTitle?: string;
 }) {
   if (state.items.length === 0) {
     return state.loading ? (
@@ -989,7 +1054,7 @@ function FlatEpisodeList({
   if (groupByCourse || groupByPodcast) {
     state.items.forEach((ep) => {
       const key = groupByCourse
-        ? ep.courseTitle || AHMED_ARABI_SOLO_TITLE
+        ? ep.courseTitle || soloTitle
         : ep.podcast_id || 'other';
       const group = groups.get(key) || {
         id: key,
@@ -1004,8 +1069,8 @@ function FlatEpisodeList({
   }
   const courseIndex = (title: string) => {
     if (!groupByCourse) return -1;
-    const index = AHMED_ARABI_COURSES.findIndex((course) => course.title === title);
-    return index === -1 ? AHMED_ARABI_COURSES.length : index;
+    const index = courseOrder.indexOf(title);
+    return index === -1 ? courseOrder.length : index;
   };
   const orderedGroups = [...groups.values()].sort(
     (a, b) =>
@@ -1123,11 +1188,13 @@ function EpisodeRow({
       </button>
       <div className="flex-1 min-w-0">
         <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 truncate">{ep.title}</h3>
-        {ep.podcast && (
+        {ep.podcast && (ep.podcast.id.startsWith('curated:') || ep.podcast.id.startsWith('quran:') ? (
+          <span className="truncate text-xs text-neutral-500 dark:text-neutral-400">{ep.podcast.title}</span>
+        ) : (
           <Link to={`/podcasts/${ep.podcast.id}`} className="text-xs text-primary-600 dark:text-primary-400 hover:underline truncate">
             {ep.podcast.title}
           </Link>
-        )}
+        ))}
         <div className="flex items-center gap-3 mt-0.5">
           {ep.duration_seconds > 0 && (
             <span className="text-xs text-neutral-400">{formatDuration(ep.duration_seconds)}</span>

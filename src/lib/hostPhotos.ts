@@ -1,4 +1,5 @@
 import { AHMED_ARABI_PHOTO } from './ahmedArabi';
+import { BASEL_MOUNES_PHOTO } from './baselMounes';
 
 // Verified portraits that must win over stale artwork imported from RSS feeds.
 const HOST_PHOTO_OVERRIDES: Record<string, string> = {
@@ -7,6 +8,8 @@ const HOST_PHOTO_OVERRIDES: Record<string, string> = {
   'ahmed-abdelmoneim': 'https://unavatar.io/x/A_Abdelmonem82',
   // د. أحمد العربي — portrait from his only official channel (t.me/Ahmed_Elaraby).
   'ahmed-arabi': AHMED_ARABI_PHOTO,
+  // م. باسل مؤنس — portrait from his own channel (t.me/ttbasil).
+  'basel-mounes': BASEL_MOUNES_PHOTO,
 };
 
 const HOST_PHOTO_FALLBACKS: Record<string, string> = {

@@ -10,6 +10,12 @@ import {
   AHMED_ARABI_HOST,
   AHMED_ARABI_SLUG,
 } from '@/lib/ahmedArabi';
+import {
+  BASEL_MOUNES_COURSES,
+  BASEL_MOUNES_EPISODES,
+  BASEL_MOUNES_HOST,
+  BASEL_MOUNES_SLUG,
+} from '@/lib/baselMounes';
 import type { Host } from '@/types/podcast';
 
 type SortOption = 'all' | 'fame' | 'followers' | 'popular' | 'newest' | 'az';
@@ -131,6 +137,26 @@ export default function HostsPage() {
     const ahmedIndex = mapped.findIndex((h) => h.slug === AHMED_ARABI_SLUG);
     if (ahmedIndex >= 0) mapped[ahmedIndex] = ahmedStats;
     else mapped.push(ahmedStats);
+
+    // م. باسل مؤنس has verified public lessons/recitations, but they are not
+    // imported as podcast rows. Show his real curated counts instead of zeros.
+    const baselCategory = BASEL_MOUNES_HOST.category?.name_ar || 'روحاني / ديني';
+    const baselStats: HostStats = {
+      ...(mapped.find((h) => h.slug === BASEL_MOUNES_SLUG) || BASEL_MOUNES_HOST),
+      podcasts_count: BASEL_MOUNES_COURSES.length,
+      episodes_count: BASEL_MOUNES_EPISODES.length,
+      avg_rating: 0,
+      categories: [
+        ...new Set([
+          ...(mapped.find((h) => h.slug === BASEL_MOUNES_SLUG)?.categories || []),
+          baselCategory,
+        ]),
+      ],
+    };
+    const baselIndex = mapped.findIndex((h) => h.slug === BASEL_MOUNES_SLUG);
+    if (baselIndex >= 0) mapped[baselIndex] = baselStats;
+    else mapped.push(baselStats);
+
     mapped.sort((a, b) => safeNumber(b.followers_count) - safeNumber(a.followers_count));
 
     setHosts(mapped);
@@ -233,7 +259,7 @@ export default function HostsPage() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="ابحث عن مقدم أو تخصص... (يدعم البحث بدون همزات/تشكيل)"
+          placeholder="ابحث عن مقدم أو تخصص..."
           className="w-full pr-11 pl-11 py-3 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
         />
         {searchQuery && (

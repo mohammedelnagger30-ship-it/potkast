@@ -13,6 +13,7 @@ export interface FeaturedPerson {
 }
 
 import { AHMED_ARABI_PHOTO } from './ahmedArabi';
+import { BASEL_MOUNES_PHOTO } from './baselMounes';
 
 export const FEATURED_HOSTS: FeaturedPerson[] = [
   {
@@ -21,6 +22,13 @@ export const FEATURED_HOSTS: FeaturedPerson[] = [
     specialty: 'العبادات والتزكية',
     photo: AHMED_ARABI_PHOTO,
     slug: 'ahmed-arabi',
+  },
+  {
+    name: 'م. باسل مؤنس',
+    title: 'قارئ ومحاضر',
+    specialty: 'التدبر والتلاوة — رحمه الله',
+    photo: BASEL_MOUNES_PHOTO,
+    slug: 'basel-mounes',
   },
   {
     name: 'أحمد الشقيري',

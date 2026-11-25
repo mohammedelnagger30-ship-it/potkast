@@ -418,7 +418,9 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
   const saveProgress = useCallback(
     async (episodeId: string, seconds: number, completed: boolean) => {
-      if (!user || isQuranRecitationId(episodeId)) return;
+      // Curated recitations/lessons have no row in listening_history; writing
+      // their synthetic IDs would either fail or pollute real completion stats.
+      if (!user || isQuranRecitationId(episodeId) || episodeId.startsWith('curated:')) return;
       const now = Date.now();
       if (now - lastSaveRef.current < SAVE_INTERVAL_MS && !completed) return;
       lastSaveRef.current = now;
