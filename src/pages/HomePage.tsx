@@ -4,6 +4,7 @@ import { Card, CardHeader, Badge, ProgressBar } from '@/components/ui';
 import { Sparkles, Mic, Target, TrendingUp, ArrowLeft, Zap, CheckCircle2, Flame, Lightbulb, BookOpen, Quote, ScrollText, Brain, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useProgress } from '@/context/ProgressContext';
 import { supabase } from '@/lib/supabase';
 import { levelFromXp, xpProgressInLevel } from '@/lib/gamification';
 import { getDailyTip, type Tip } from '@/lib/notifications';
@@ -26,7 +27,7 @@ const HOME_CACHE_MAX_AGE = 10 * 60 * 1000;
 interface HomeSnapshot {
   userId: string;
   date: string;
-  stats: { episodesListened: number; missionsCompleted: number; xp: number; streak: number };
+  stats: { missionsCompleted: number; xp: number; streak: number };
   missions: UserMission[];
   tip: Tip | null;
   savedAt: number;
@@ -45,10 +46,11 @@ function readHomeCache(userId: string, today: string): HomeSnapshot | null {
   }
 }
 
-const emptyStats = { episodesListened: 0, missionsCompleted: 0, xp: 0, streak: 0 };
+const emptyStats = { missionsCompleted: 0, xp: 0, streak: 0 };
 
 export default function HomePage() {
   const { user, profile } = useAuth();
+  const { progress } = useProgress();
   const today = new Date().toISOString().split('T')[0];
   const cached = useMemo(() => (user ? readHomeCache(user.id, today) : null), [user, today]);
 
@@ -62,18 +64,15 @@ export default function HomePage() {
 
 
     // These calls do not depend on each other. Running them together removes
-    // the old 4-request waterfall that made the home page feel slow to open.
-    const [completedRes, listenedRes, todayRes, tip] = await Promise.all([
+    // the old request waterfall that made the home page feel slow to open.
+    // Completed episodes come from ProgressContext, which counts only history
+    // rows marked completed (not episodes that were merely opened).
+    const [completedRes, todayRes, tip] = await Promise.all([
       supabase
         .from('user_missions')
         .select('id, completed_at, assigned_date, status, mission:missions(*)')
         .eq('user_id', user.id)
         .eq('status', 'completed'),
-      // Only the row count is needed; head:true avoids shipping every id.
-      supabase
-        .from('listening_history')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id),
       supabase
         .from('user_missions')
         .select('*, mission:missions(*)')
@@ -111,7 +110,6 @@ export default function HomePage() {
     }
 
     const nextStats = {
-      episodesListened: listenedRes.count ?? 0,
       missionsCompleted: completedMissions.length,
       xp: profile?.xp || 0,
       streak: currentStreak,
@@ -232,7 +230,7 @@ export default function HomePage() {
       {/* Quick stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
-          { icon: Mic, label: 'حلقات استمعت لها', value: stats.episodesListened.toString(), color: 'text-primary-600' },
+          { icon: Mic, label: 'حلقات أكملت استماعها', value: progress.completedEpisodes.toString(), color: 'text-primary-600' },
           { icon: Target, label: 'مهام مكتملة', value: stats.missionsCompleted.toString(), color: 'text-accent-500' },
           { icon: Flame, label: 'أيام متتالية', value: stats.streak.toString(), color: 'text-success-500' },
           { icon: Zap, label: 'نقاط الخبرة', value: stats.xp.toLocaleString('ar-EG'), color: 'text-primary-600' },

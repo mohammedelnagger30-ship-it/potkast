@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Search, X, ArrowUpDown } from 'lucide-react';
 import { Layout } from '@/components/layout';
 import { HostCard } from '@/components/HostCard';
@@ -13,11 +13,14 @@ type HostStats = Host & {
   episodes_count: number;
   total_plays: number;
   avg_rating: number;
+  /** Categories of this presenter's own shows (plus their profile category). */
+  categories: string[];
 };
 
 type PodcastAggregate = {
   plays_count: number | null;
   rating_avg: number | null;
+  category?: { name_ar: string } | null;
   episodes?: { count: number }[];
 };
 
@@ -46,10 +49,31 @@ export default function HostsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<SortOption>('all');
 
+  // RTL chip rows ignore a normal vertical mouse wheel. Turn it into horizontal
+  // scrolling until either end is reached, then let the page scroll normally.
+  const categoryStripRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const strip = categoryStripRef.current;
+    if (!strip) return;
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+      const maxScroll = strip.scrollWidth - strip.clientWidth;
+      if (maxScroll <= 1) return;
+      const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
+      const atStart = strip.scrollLeft >= -1 && delta < 0;
+      const atEnd = strip.scrollLeft <= -maxScroll + 1 && delta > 0;
+      if (atStart || atEnd) return;
+      event.preventDefault();
+      strip.scrollLeft -= delta;
+    };
+    strip.addEventListener('wheel', onWheel, { passive: false });
+    return () => strip.removeEventListener('wheel', onWheel);
+  }, []);
+
   const fetchHosts = useCallback(async () => {
     const { data, error } = await supabase
       .from('hosts')
-      .select('*, category:categories(*), podcasts(plays_count, rating_avg, episodes(count))')
+      .select('*, category:categories(*), podcasts(plays_count, rating_avg, category:categories(name_ar), episodes(count))')
       .order('followers_count', { ascending: false });
 
     if (error) {
@@ -61,6 +85,16 @@ export default function HostsPage() {
       .map(({ podcasts, ...host }): HostStats => {
         const shows = podcasts || [];
         const rated = shows.filter((p) => safeNumber(p.rating_avg) > 0);
+
+        // A presenter belongs to a category when their profile says so OR, more
+        // reliably, when one of their actual podcasts is filed under it. This
+        // keeps every chip tied to real content on the platform.
+        const categoryNames = new Set<string>();
+        if (host.category?.name_ar) categoryNames.add(host.category.name_ar);
+        for (const show of shows) {
+          if (show.category?.name_ar) categoryNames.add(show.category.name_ar);
+        }
+
         return {
           ...host,
           podcasts_count: shows.length,
@@ -69,6 +103,7 @@ export default function HostsPage() {
           avg_rating: rated.length
             ? rated.reduce((sum, p) => sum + safeNumber(p.rating_avg), 0) / rated.length
             : 0,
+          categories: [...categoryNames],
         };
       });
     setHosts(mapped);
@@ -79,15 +114,17 @@ export default function HostsPage() {
     fetchHosts();
   }, [fetchHosts]);
 
-  // Only categories that actually have hosts, de-duplicated by Arabic name
-  // (the categories table holds several rows per name). Use the name itself
-  // as the filter value so all duplicate-id rows are included together.
+  // Only categories that really have presenters here. Sorting by how many
+  // presenters each one has puts the useful chips first; duplicate category
+  // names are merged because filtering uses the name, not a single row id.
   const categoryOptions = useMemo(() => {
-    const names = new Set<string>();
+    const counts = new Map<string, number>();
     for (const h of hosts) {
-      if (h.category?.name_ar) names.add(h.category.name_ar);
+      for (const name of h.categories) counts.set(name, (counts.get(name) || 0) + 1);
     }
-    return [...names].sort((a, b) => a.localeCompare(b, 'ar'));
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ar'))
+      .map(([name]) => name);
   }, [hosts]);
 
   const filtered = useMemo(() => {
@@ -115,7 +152,7 @@ export default function HostsPage() {
           searchQuery &&
           !matchesAnyArabicSearch(searchQuery, h.name_ar, h.specialty_ar, h.title_ar, h.bio_ar, h.country)
         ) return false;
-        if (selectedCategory !== 'all' && h.category?.name_ar !== selectedCategory) return false;
+        if (selectedCategory !== 'all' && !h.categories.includes(selectedCategory)) return false;
         return true;
       })
       .sort((a, b) => {
@@ -183,7 +220,7 @@ export default function HostsPage() {
       </div>
 
       {/* Category chips */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar mb-4">
+      <div ref={categoryStripRef} className="flex gap-2 overflow-x-auto no-scrollbar scroll-smooth mb-4">
         <button
           onClick={() => setSelectedCategory('all')}
           className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${
