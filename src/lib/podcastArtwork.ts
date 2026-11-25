@@ -10,17 +10,19 @@ import type { Podcast } from '@/types/podcast';
  */
 
 const COVER_OVERRIDES: Record<string, string> = {
+  // Highest-resolution artwork available for each playlist/episode. The client
+  // proxy crops these to the same square shape as every other podcast cover.
   // د. أحمد عبد المنعم — playlists linked from the imported RSS feeds.
-  '0fec59ca-1f6e-52a8-af96-bab6c7c57bce': 'https://i.ytimg.com/vi/PCvkBlD_wvs/hqdefault.jpg', // تربويات
-  'b22031ab-10ac-5f81-9f92-ff1f8cd0035f': 'https://i.ytimg.com/vi/FD2pnGsMEcY/hqdefault.jpg', // عن القرآن
-  '07d7b7ba-b3a0-5d81-b4db-7ea06b6352ad': 'https://i.ytimg.com/vi/U_BAOVorAnQ/hqdefault.jpg', // هدى للناس
+  '0fec59ca-1f6e-52a8-af96-bab6c7c57bce': 'https://i.ytimg.com/vi/PCvkBlD_wvs/maxresdefault.jpg', // تربويات
+  'b22031ab-10ac-5f81-9f92-ff1f8cd0035f': 'https://i.ytimg.com/vi/FD2pnGsMEcY/maxresdefault.jpg', // عن القرآن
+  '07d7b7ba-b3a0-5d81-b4db-7ea06b6352ad': 'https://i.ytimg.com/vi/U_BAOVorAnQ/maxresdefault.jpg', // هدى للناس
 
   // عبد الرحمن منصور — matching series/episode artwork.
-  '6d2b4b52-fa59-5699-bc59-2e16a7fd08a0': 'https://i.ytimg.com/vi/TyaO8XGQp5g/hqdefault.jpg', // الناس والسحر
-  'c1dcf32b-2e15-5713-926d-cb0fb7e9a09e': 'https://i.ytimg.com/vi/7jTyTU04R5o/hqdefault.jpg', // للبيوت أسرار
-  '053d2ac3-bb78-5607-afde-e4342aca6cc4': 'https://i.ytimg.com/vi/uyKVwqs3iIY/hqdefault.jpg', // قصة التأهيل
-  '87bc3a87-dbaa-5311-ac97-ba2f0c9f6b23': 'https://i.ytimg.com/vi/RkHvi2E8NnE/hqdefault.jpg', // أضلني صاحبي
-  '97e440b7-bef7-597c-a67c-40dbfa6ef98a': 'https://i.ytimg.com/vi/BE5-FL-t1R8/hqdefault.jpg', // محاضرات متنوعة
+  '6d2b4b52-fa59-5699-bc59-2e16a7fd08a0': 'https://i.ytimg.com/vi/TyaO8XGQp5g/sddefault.jpg', // الناس والسحر
+  'c1dcf32b-2e15-5713-926d-cb0fb7e9a09e': 'https://i.ytimg.com/vi/7jTyTU04R5o/mqdefault.jpg', // للبيوت أسرار
+  '053d2ac3-bb78-5607-afde-e4342aca6cc4': 'https://i.ytimg.com/vi/uyKVwqs3iIY/maxresdefault.jpg', // قصة التأهيل
+  '87bc3a87-dbaa-5311-ac97-ba2f0c9f6b23': 'https://i.ytimg.com/vi/RkHvi2E8NnE/sddefault.jpg', // أضلني صاحبي
+  '97e440b7-bef7-597c-a67c-40dbfa6ef98a': 'https://i.ytimg.com/vi/BE5-FL-t1R8/maxresdefault.jpg', // محاضرات متنوعة
 };
 
 function isReusedPortrait(url: string, host?: Podcast['host']): boolean {

@@ -268,7 +268,7 @@ export default function PodcastsPage() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="ابحث عن بودكاست أو مقدم... (يدعم البحث بدون همزات/تشكيل)"
+          placeholder="ابحث عن بودكاست أو مقدم..."
           className="w-full pr-11 pl-11 py-3 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
         />
         {searchQuery && (
