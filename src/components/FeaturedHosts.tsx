@@ -1,44 +1,39 @@
-import { useEffect, useState } from 'react';
 import { CarouselSection } from '@/components/CarouselSection';
 import { HostCard } from '@/components/HostCard';
-import { supabase } from '@/lib/supabase';
+import { FEATURED_HOSTS, type FeaturedPerson } from '@/lib/featuredHosts';
 import type { Host } from '@/types/podcast';
 
-// Survives navigation between Home and other tabs: the featured list barely
-// changes, so re-fetching it on every home mount only slows the first paint.
-let cachedHosts: Host[] | null = null;
-let cachedAt = 0;
-const CACHE_TTL = 10 * 60 * 1000;
+/** Keep the curated order; seed-data follower numbers are not trustworthy. */
+function toHost(person: FeaturedPerson): Host {
+  return {
+    id: person.slug || person.url || person.name,
+    name_ar: person.name,
+    slug: person.slug || '',
+    photo_url: person.photo,
+    cover_url: '',
+    title_ar: person.title,
+    specialty_ar: person.specialty,
+    bio_ar: person.source,
+    country: 'الوطن العربي',
+    category_id: null,
+    is_verified: true,
+    followers_count: 0,
+    social_links: {},
+    created_at: new Date(0).toISOString(),
+  };
+}
 
 export function FeaturedHosts() {
-  const [hosts, setHosts] = useState<Host[]>(() =>
-    cachedHosts && Date.now() - cachedAt < CACHE_TTL ? cachedHosts : []
-  );
-
-  useEffect(() => {
-    if (cachedHosts && Date.now() - cachedAt < CACHE_TTL) return;
-    supabase
-      .from('hosts')
-      .select('id,name_ar,slug,photo_url,cover_url,title_ar,specialty_ar,is_verified,followers_count,podcasts(count)')
-      .order('followers_count', { ascending: false })
-      .limit(10)
-      .then(({ data }) => {
-        const mapped = ((data || []) as unknown as (Host & { podcasts: { count: number }[] })[]).map((h) => ({
-          ...h,
-          podcasts_count: h.podcasts?.[0]?.count ?? 0,
-        }));
-        cachedHosts = mapped;
-        cachedAt = Date.now();
-        setHosts(mapped);
-      });
-  }, []);
-
-  if (hosts.length === 0) return null;
-
   return (
-    <CarouselSection title="مقدمون مميزون" subtitle="نخبة من الخبراء والعلماء">
-      {hosts.map((host) => (
-        <HostCard key={host.id} host={host} compact />
+    <CarouselSection title="أشهر مقدمين العرب" subtitle="شخصيات حقيقية موثّقة بحساباتها الرسمية">
+      {FEATURED_HOSTS.map((person) => (
+        <HostCard
+          key={person.name}
+          host={toHost(person)}
+          compact
+          externalUrl={person.url}
+          sourceLabel={person.source}
+        />
       ))}
     </CarouselSection>
   );

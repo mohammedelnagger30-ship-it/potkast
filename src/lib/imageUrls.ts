@@ -15,7 +15,7 @@ const PROXY_ORIGIN = 'https://wsrv.nl/';
 const MAX_CACHE_ENTRIES = 800;
 // Wikimedia already serves small, well-cached thumbnails and rate-limits the
 // proxy's upstream requests, so pass those URLs through unchanged.
-const DIRECT_IMAGE_HOSTS = new Set(['upload.wikimedia.org', 'graph.facebook.com']);
+const DIRECT_IMAGE_HOSTS = new Set(['upload.wikimedia.org', 'graph.facebook.com', 'unavatar.io']);
 
 export type ImageAspect = 'square' | 'wide';
 
