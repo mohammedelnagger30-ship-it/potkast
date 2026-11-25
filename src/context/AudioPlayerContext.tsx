@@ -187,6 +187,104 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const [playbackRate, setPlaybackRateState] = useState(1);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('none');
 
+  /**
+   * Resume the current episode from the app UI or the Android notification.
+   *
+   * A notification action is not a WebView user gesture, and Android may leave
+   * the media element in a stalled state after a long background pause. Play can
+   * also stay pending instead of rejecting, so a watchdog rebuilds the source a
+   * couple of times when no audio frame actually arrives.
+   */
+  const resumePlayback = useCallback((resumeSeconds?: number, attempt = 0) => {
+    const audio = audioRef.current;
+    const episode = currentEpisodeRef.current;
+    if (!audio || !episode?.audio_url) return;
+    const ep = episode;
+    const el = audio;
+
+    const savedPosition = progressRef.current > 0 ? progressRef.current : el.currentTime;
+    const resumeAt = Math.max(0, Math.floor(resumeSeconds ?? savedPosition ?? 0));
+
+    function armWatchdog(token: number, currentAttempt: number) {
+      let started = false;
+      let timer = 0;
+
+      const cleanup = () => {
+        window.clearTimeout(timer);
+        el.removeEventListener('playing', onPlaying);
+        el.removeEventListener('timeupdate', onTime);
+      };
+      const onPlaying = () => { started = true; cleanup(); };
+      const onTime = () => {
+        if (!el.paused && el.currentTime > 0) {
+          started = true;
+          cleanup();
+        }
+      };
+
+      timer = window.setTimeout(() => {
+        cleanup();
+        if (started || token !== playTokenRef.current || audioRef.current !== el) return;
+        if (currentAttempt >= 2) {
+          setIsPlaying(false);
+          setIsBuffering(false);
+          return;
+        }
+        // No 'playing' event: the WebView accepted play() but never resumed.
+        // Rebuilding the source clears the stalled media pipeline.
+        startFresh(currentAttempt + 1);
+      }, 1500);
+
+      el.addEventListener('playing', onPlaying, { once: true });
+      el.addEventListener('timeupdate', onTime);
+    }
+
+    function startFresh(currentAttempt: number) {
+      const token = ++playTokenRef.current;
+      const local = isLocalAudioUrl(resolveAudioUrl(ep.audio_url, ep.id));
+      const source = sourceFor(ep.id, ep.audio_url, local ? resumeAt : 0);
+      el.src = source.url;
+      // Clear any stale MEDIA_ELEMENT_ERROR left by a previous stop()/source swap.
+      el.load();
+      el.playbackRate = playbackRateRef.current;
+      setIsBuffering(true);
+      void el.play().catch(() => {
+        if (token === playTokenRef.current && currentAttempt < 2) {
+          startFresh(currentAttempt + 1);
+        } else if (token === playTokenRef.current) {
+          setIsPlaying(false);
+          setIsBuffering(false);
+        }
+      });
+      if (!source.local && resumeAt > 5) {
+        resumeAfterAudible(el, resumeAt, () => token === playTokenRef.current && audioRef.current === el);
+      }
+      armWatchdog(token, currentAttempt);
+    }
+
+    const hasSource = !!el.getAttribute('src');
+    if (!hasSource || el.error || el.ended || el.readyState === 0) {
+      startFresh(attempt);
+      return;
+    }
+
+    if (el.ended) {
+      try { el.currentTime = 0; } catch { /* ignore */ }
+    }
+    const token = playTokenRef.current;
+    setIsBuffering(true);
+    void el.play().catch(() => {
+      // A backgrounded WebView can reject play() once; retry with a fresh
+      // source before giving up so the notification button still works.
+      if (token === playTokenRef.current && attempt < 2) startFresh(attempt + 1);
+      else if (token === playTokenRef.current) {
+        setIsPlaying(false);
+        setIsBuffering(false);
+      }
+    });
+    armWatchdog(token, attempt);
+  }, []);
+
   // Initialize audio element once
   useEffect(() => {
     const audio = new Audio();
@@ -421,7 +519,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       // If same episode, just toggle play
       if (currentEpisode?.id === episode.id) {
         if (audioRef.current.paused) {
-          audioRef.current.play().catch(() => setIsPlaying(false));
+          resumePlayback();
         } else {
           audioRef.current.pause();
         }
@@ -463,7 +561,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         resumeAfterAudible(audio, resumeAt, isCurrent);
       }
     },
-    [currentEpisode, playbackRate]
+    [currentEpisode, playbackRate, resumePlayback]
   );
 
   const setCurrentQueue = useCallback((episodes: Episode[]) => {
@@ -479,12 +577,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const togglePlay = useCallback(() => {
     if (!audioRef.current || !currentEpisode) return;
     if (audioRef.current.paused) {
-      setIsBuffering(true);
-      audioRef.current.play().catch(() => setIsPlaying(false));
+      resumePlayback();
     } else {
       audioRef.current.pause();
     }
-  }, [currentEpisode]);
+  }, [currentEpisode, resumePlayback]);
 
   const seek = useCallback((time: number) => {
     if (!audioRef.current) return;
@@ -587,44 +684,9 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       const audio = audioRef.current;
       if (!audio) return;
       switch (action) {
-        case 'play': {
-          const ep = currentEpisodeRef.current;
-          if (!ep) return;
-          setIsBuffering(true);
-          // After long background pauses the WebView/audio element can end up in a
-          // stalled or empty state; rebuild the source before retrying playback.
-          if (!audio.src || audio.error) {
-            const token = ++playTokenRef.current;
-            const local = isLocalAudioUrl(resolveAudioUrl(ep.audio_url, ep.id));
-            const resumeAt = Math.max(0, Math.floor(audio.currentTime || progressRef.current || 0));
-            const source = sourceFor(ep.id, ep.audio_url, local ? resumeAt : 0);
-            audio.src = source.url;
-            audio.playbackRate = playbackRateRef.current;
-            void audio.play().catch(() => { if (token === playTokenRef.current) setIsPlaying(false); });
-            if (!source.local && resumeAt > 5) {
-              resumeAfterAudible(audio, resumeAt, () => token === playTokenRef.current && audioRef.current === audio);
-            }
-            break;
-          }
-          if (audio.ended) {
-            try { audio.currentTime = 0; } catch { /* ignore */ }
-          }
-          void audio.play().catch(() => {
-            // Retry once with a fresh source - some WebViews drop the media element
-            // after background pause/notification interactions.
-            const token = ++playTokenRef.current;
-            const local = isLocalAudioUrl(resolveAudioUrl(ep.audio_url, ep.id));
-            const resumeAt = Math.max(0, Math.floor(progressRef.current || audio.currentTime || 0));
-            const source = sourceFor(ep.id, ep.audio_url, local ? resumeAt : 0);
-            audio.src = source.url;
-            audio.playbackRate = playbackRateRef.current;
-            void audio.play().catch(() => { if (token === playTokenRef.current) setIsPlaying(false); });
-            if (!source.local && resumeAt > 5) {
-              resumeAfterAudible(audio, resumeAt, () => token === playTokenRef.current && audioRef.current === audio);
-            }
-          });
+        case 'play':
+          resumePlayback();
           break;
-        }
         case 'pause':
           audio.pause();
           break;
@@ -649,7 +711,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       }
     }).then((listener) => { handle = listener; }).catch(() => undefined);
     return () => { handle?.remove(); };
-  }, []);
+  }, [resumePlayback]);
 
   // Save progress on unmount/page hide
   useEffect(() => {

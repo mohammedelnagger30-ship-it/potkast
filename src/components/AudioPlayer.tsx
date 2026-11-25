@@ -283,6 +283,14 @@ export function AudioPlayer() {
               >
                 <Maximize2 size={17} />
               </button>
+              <button
+                onClick={stop}
+                className="text-neutral-400 hover:text-error-500 transition-all"
+                aria-label="إغلاق المشغّل"
+                title="إغلاق المشغّل"
+              >
+                <X size={17} />
+              </button>
             </div>
           </div>
         </div>
