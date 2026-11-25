@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { Heart, Headphones, Play, Pause, Trash2 } from 'lucide-react';
 import { Layout } from '@/components/layout';
 import { Card } from '@/components/ui';
-import { EpisodeArtwork, PodcastArtwork } from '@/components/Artwork';
 import { DownloadButton } from '@/components/DownloadButton';
+import { OptimizedImage } from '@/components/OptimizedImage';
 import { useAuth } from '@/context/AuthContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { supabase } from '@/lib/supabase';
@@ -71,7 +71,7 @@ export default function FavoritesPage() {
                 {podcasts.map((p) => (
                   <Card key={p.id} className="flex items-center gap-3">
                     <Link to={`/podcasts/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-                      <PodcastArtwork podcast={p} className="h-14 w-14 rounded-xl" />
+                      {p.cover_url ? <OptimizedImage src={p.cover_url} alt="" width={112} className="h-14 w-14 rounded-xl object-cover" /> : <div className="h-14 w-14 rounded-xl bg-primary-100 dark:bg-primary-900/30" />}
                       <div className="min-w-0">
                         <p className="truncate text-sm font-bold text-neutral-900 dark:text-white">{p.title}</p>
                         <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{p.host?.name_ar || p.host_name}</p>
@@ -103,13 +103,10 @@ export default function FavoritesPage() {
                     <Card key={ep.id} className="flex items-center gap-3">
                       <button
                         onClick={() => { if (isCurrent) togglePlay(); else playEpisode(ep, ep.podcast, [ep]); }}
-                        className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-xl"
+                        className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${isCurrent ? 'bg-primary-600 text-white' : 'bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400'}`}
                         aria-label={playing ? 'إيقاف' : 'تشغيل'}
                       >
-                        <EpisodeArtwork episode={ep} className="absolute inset-0 h-full w-full" />
-                        <span className={`absolute inset-0 flex items-center justify-center ${isCurrent ? 'bg-black/40 text-white' : 'bg-black/25 text-white'}`}>
-                          {playing ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="mr-0.5" />}
-                        </span>
+                        {playing ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="mr-0.5" />}
                       </button>
                       <div className="min-w-0 flex-1">
                         <Link to={ep.podcast?.id ? `/podcasts/${ep.podcast.id}` : '#'} className="block truncate text-sm font-bold text-neutral-900 dark:text-white hover:text-primary-600">{ep.title}</Link>

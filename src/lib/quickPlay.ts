@@ -50,6 +50,11 @@ function seedFromCache(): void {
   }
 }
 
+/** Seed the locally cached index without fetching the 280KB network snapshot. */
+export function warmQuickPlayFromCache(): void {
+  seedFromCache();
+}
+
 export function quickEpisodeFor(podcastId: string): Episode | undefined {
   return quickEpisodes.get(podcastId);
 }

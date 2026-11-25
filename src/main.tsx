@@ -9,7 +9,7 @@ import { AudioPlayerProvider } from '@/context/AudioPlayerContext';
 import { DownloadProvider } from '@/context/DownloadContext';
 import { ProgressProvider } from '@/context/ProgressContext';
 import { UpdateProvider } from '@/context/UpdateContext';
-import { loadQuickPlayIndex } from '@/lib/quickPlay';
+import { warmQuickPlayFromCache } from '@/lib/quickPlay';
 import './index.css';
 
 if ('serviceWorker' in navigator) {
@@ -29,9 +29,10 @@ function finishBoot() {
   window.setTimeout(remove, 260);
 }
 
-// Fetch the real-catalog play index after the first paint. By the time the
-// user reaches a podcast list, play buttons can start audio synchronously.
-const startIndexLoad = () => { void loadQuickPlayIndex(); };
+// Only seed the small cached copy after first paint. The 280KB network index
+// is fetched lazily when the user actually browses/plays a podcast, so it no
+// longer competes with the first screen and its images on cold starts.
+const startIndexLoad = () => { warmQuickPlayFromCache(); };
 const idleCallback = (window as Window & {
   requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
 }).requestIdleCallback;

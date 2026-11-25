@@ -15,8 +15,8 @@ import {
   Maximize2,
   Loader2,
 } from 'lucide-react';
-import { EpisodeArtwork } from '@/components/Artwork';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
+import { OptimizedImage } from '@/components/OptimizedImage';
 import { formatTime } from '@/types/podcast';
 
 const speedOptions = [0.75, 1, 1.25, 1.5, 2];
@@ -56,6 +56,7 @@ export function AudioPlayer() {
   if (!currentEpisode) return null;
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const coverUrl = currentPodcast?.cover_url || '';
   const podcastTitle = currentPodcast?.title || '';
   const host = currentPodcast?.host;
 
@@ -84,10 +85,20 @@ export function AudioPlayer() {
           <div className="flex items-center gap-3 px-3 py-2.5 lg:px-6 lg:py-3">
             {/* Cover + info */}
             <div className="flex items-center gap-3 min-w-0 flex-1 lg:flex-none lg:w-64">
-              <EpisodeArtwork
-                episode={currentEpisode}
-                className="h-11 w-11 flex-shrink-0 rounded-lg lg:h-12 lg:w-12"
-              />
+              {coverUrl ? (
+                <OptimizedImage
+                  src={coverUrl}
+                  alt={podcastTitle}
+                  width={96}
+                  priority
+                  sizes="48px"
+                  className="w-11 h-11 lg:w-12 lg:h-12 rounded-lg object-cover flex-shrink-0"
+                />
+              ) : (
+                <div className="w-11 h-11 lg:w-12 lg:h-12 rounded-lg bg-primary-600 flex items-center justify-center text-white flex-shrink-0">
+                  <Play size={20} fill="currentColor" />
+                </div>
+              )}
               <div className="min-w-0">
                 <p className="text-sm font-bold text-neutral-900 dark:text-white truncate">
                   {currentEpisode.title}

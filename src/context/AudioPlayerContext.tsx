@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, useCal
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { updateStatsOnListen } from '@/lib/statsHelper';
+import { optimizedImageUrl } from '@/lib/imageUrls';
 import { localUrlFor, OFFLINE_AUDIO_PREFIX } from '@/lib/downloads';
 import {
   isMediaNotificationSupported,
@@ -202,7 +203,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       const track: MediaTrack = {
         title: episode.title,
         artist: notificationArtist(episode, podcast),
-        artwork: episode.podcast?.cover_url || podcast?.cover_url || '',
+        artwork: optimizedImageUrl(episode.podcast?.cover_url || podcast?.cover_url, 320),
         duration: Math.floor((audio.duration || 0) * 1000),
         position: Math.floor(audio.currentTime * 1000),
         playing,
@@ -291,7 +292,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     startMediaNotification({
       title: currentEpisode.title,
       artist: notificationArtist(currentEpisode, currentPodcast),
-      artwork: currentEpisode.podcast?.cover_url || currentPodcast?.cover_url || '',
+      artwork: optimizedImageUrl(currentEpisode.podcast?.cover_url || currentPodcast?.cover_url, 320),
       duration: Math.floor(duration * 1000),
       position: Math.floor(currentTime * 1000),
       playing: isPlaying,

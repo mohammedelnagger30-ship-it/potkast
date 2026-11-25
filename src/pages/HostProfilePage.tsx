@@ -18,8 +18,8 @@ import {
 import { Layout } from '@/components/layout';
 import { Button, Badge, ProgressBar } from '@/components/ui';
 import { PodcastCard } from '@/components/PodcastCard';
-import { HostArtwork, PodcastArtwork } from '@/components/Artwork';
 import { DownloadButton } from '@/components/DownloadButton';
+import { OptimizedImage } from '@/components/OptimizedImage';
 import { useAuth } from '@/context/AuthContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { useProgress } from '@/context/ProgressContext';
@@ -326,7 +326,7 @@ export default function HostProfilePage() {
       <div className="card-base overflow-hidden mb-6 animate-fade-in-up">
         <div className="relative h-36 lg:h-48">
           {host.cover_url ? (
-            <img src={host.cover_url} alt="" className="w-full h-full object-cover" />
+            <OptimizedImage src={host.cover_url} alt="" width={1200} aspect="wide" priority className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-primary-600 to-primary-800" />
           )}
@@ -337,7 +337,15 @@ export default function HostProfilePage() {
           <div className="flex flex-col sm:flex-row sm:items-end gap-4 pt-3">
             <div className="relative flex-shrink-0 -mt-20 sm:-mt-24">
               <div className="w-24 h-24 lg:w-28 lg:h-28 rounded-full p-1 bg-white dark:bg-neutral-900">
-                <HostArtwork host={host} className="h-full w-full rounded-full text-3xl" />
+                <div className="w-full h-full rounded-full overflow-hidden bg-neutral-200 dark:bg-neutral-800">
+                  {host.photo_url ? (
+                    <OptimizedImage src={host.photo_url} alt={name} width={224} priority className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-3xl font-extrabold text-primary-600">
+                      {name.charAt(0)}
+                    </div>
+                  )}
+                </div>
               </div>
               {host.is_verified && (
                 <span className="absolute bottom-1 left-1 w-7 h-7 rounded-full bg-primary-600 text-white flex items-center justify-center border-2 border-white dark:border-neutral-900">
@@ -558,7 +566,9 @@ function SummaryCard({ podcast }: { podcast: PodcastWithCount }) {
   return (
     <div className="card-base p-4 flex flex-col gap-3">
       <div className="flex items-start gap-3">
-        <PodcastArtwork podcast={podcast} className="h-12 w-12 flex-shrink-0 rounded-xl" />
+        {podcast.cover_url && (
+          <OptimizedImage src={podcast.cover_url} alt="" width={96} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+        )}
         <div className="min-w-0 flex-1">
           <Link
             to={`/podcasts/${podcast.id}`}

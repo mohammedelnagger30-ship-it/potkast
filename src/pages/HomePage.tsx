@@ -69,9 +69,10 @@ export default function HomePage() {
         .select('id, completed_at, assigned_date, status, mission:missions(*)')
         .eq('user_id', user.id)
         .eq('status', 'completed'),
+      // Only the row count is needed; head:true avoids shipping every id.
       supabase
         .from('listening_history')
-        .select('episode_id')
+        .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id),
       supabase
         .from('user_missions')
@@ -83,7 +84,6 @@ export default function HomePage() {
     ]);
 
     const completedMissions = completedRes.data || [];
-    const listened = listenedRes.data || [];
     const todayData = todayRes.data || [];
 
     // Calculate streak
@@ -111,7 +111,7 @@ export default function HomePage() {
     }
 
     const nextStats = {
-      episodesListened: listened.length,
+      episodesListened: listenedRes.count ?? 0,
       missionsCompleted: completedMissions.length,
       xp: profile?.xp || 0,
       streak: currentStreak,
@@ -139,8 +139,15 @@ export default function HomePage() {
   }, [user, profile, today]);
 
   useEffect(() => {
-    loadHomeData();
-  }, [loadHomeData]);
+    // A fresh local snapshot paints immediately; refresh quietly afterwards so
+    // the first screen never waits on four Supabase calls.
+    if (!cached) {
+      void loadHomeData();
+      return;
+    }
+    const timer = window.setTimeout(() => { void loadHomeData(); }, 2500);
+    return () => window.clearTimeout(timer);
+  }, [loadHomeData, cached]);
 
   const displayName = profile?.name || 'صديقنا';
   const level = levelFromXp(stats.xp);
