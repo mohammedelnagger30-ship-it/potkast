@@ -51,36 +51,65 @@ const AudioPlayerContext = createContext<AudioPlayerContextValue | undefined>(un
 
 const SAVE_INTERVAL_MS = 5000;
 const PROGRESS_CACHE_KEY = 'nammy:progress-cache';
+// An episode counts as listened once 90% of it has been reached. The counter
+// must not wait for the native `ended` event (some streams never fire it).
+const COMPLETION_RATIO = 0.9;
 
 // Parsing the whole progress snapshot used to happen on every single play tap.
 // Keep it in memory and invalidate it only when ProgressContext says it changed.
+interface CachedHistoryRow {
+  episode_id: string;
+  progress_seconds: number;
+  completed: boolean;
+}
+let progressHistoryCache: CachedHistoryRow[] | null = null;
 let resumeCache: Map<string, number> | null = null;
-let resumeCacheListenerAdded = false;
+let completedCache: Set<string> | null = null;
+let progressCacheListenerAdded = false;
+
+function cachedHistory(): CachedHistoryRow[] {
+  if (!progressHistoryCache) {
+    try {
+      const raw = localStorage.getItem(PROGRESS_CACHE_KEY);
+      const parsed = raw ? JSON.parse(raw) as { history?: CachedHistoryRow[] } : null;
+      progressHistoryCache = parsed?.history || [];
+    } catch {
+      // An empty cache only means playback starts from the beginning.
+      progressHistoryCache = [];
+    }
+    if (!progressCacheListenerAdded) {
+      progressCacheListenerAdded = true;
+      window.addEventListener(PROGRESS_CHANGED_EVENT, () => {
+        progressHistoryCache = null;
+        resumeCache = null;
+        completedCache = null;
+      });
+    }
+  }
+  return progressHistoryCache;
+}
 
 function getResumeCache(): Map<string, number> {
   if (!resumeCache) {
     resumeCache = new Map();
-    try {
-      const raw = localStorage.getItem(PROGRESS_CACHE_KEY);
-      if (raw) {
-        const cache = JSON.parse(raw) as {
-          history?: Array<{ episode_id: string; progress_seconds: number; completed: boolean }>;
-        };
-        for (const row of cache.history || []) {
-          if (!row.completed && row.progress_seconds > 5) {
-            resumeCache.set(row.episode_id, Math.floor(row.progress_seconds));
-          }
-        }
+    for (const row of cachedHistory()) {
+      if (!row.completed && row.progress_seconds > 5) {
+        resumeCache.set(row.episode_id, Math.floor(row.progress_seconds));
       }
-    } catch {
-      // An empty cache only means playback starts from the beginning.
-    }
-    if (!resumeCacheListenerAdded) {
-      resumeCacheListenerAdded = true;
-      window.addEventListener(PROGRESS_CHANGED_EVENT, () => { resumeCache = null; });
     }
   }
   return resumeCache;
+}
+
+/** Episodes already marked complete, so replaying one never resets its flag. */
+function getCompletedCache(): Set<string> {
+  if (!completedCache) {
+    completedCache = new Set();
+    for (const row of cachedHistory()) {
+      if (row.completed) completedCache.add(row.episode_id);
+    }
+  }
+  return completedCache;
 }
 
 // Play the downloaded file when one exists, otherwise stream the real remote URL.
@@ -168,6 +197,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   // Saving the absolute position again on every 5-second tick used to multiply
   // listening time; only the difference is credited from now on.
   const countedSecondsRef = useRef(new Map<string, number>());
+  // Once crossed, completion is sticky for the session: later 5-second saves
+  // (and replays) must never write `completed: false` over it.
+  const completedIdsRef = useRef<Set<string>>(new Set(getCompletedCache()));
+  const saveProgressRef = useRef<(_episodeId: string, _seconds: number, _completed: boolean) => Promise<void>>(
+    async () => undefined
+  );
   const progressRef = useRef(0);
   const lastTimeRenderRef = useRef(0);
   // Incremented whenever the source changes so a slow history lookup can't
@@ -317,6 +352,16 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
     const onTimeUpdate = () => {
       progressRef.current = audio.currentTime;
+      // Mark the episode complete at 90% — no need to wait for `ended`, which
+      // some streams never emit. Sticky ref makes this fire exactly once.
+      const episode = currentEpisodeRef.current;
+      const total = audio.duration;
+      if (episode && Number.isFinite(total) && total > 0
+        && !completedIdsRef.current.has(episode.id)
+        && audio.currentTime >= total * COMPLETION_RATIO) {
+        completedIdsRef.current.add(episode.id);
+        void saveProgressRef.current(episode.id, audio.currentTime, true);
+      }
       // The UI does not need 4 React renders per second. Throttling this keeps
       // the whole page responsive while the audio keeps playing smoothly.
       const now = Date.now();
@@ -426,8 +471,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       // Curated recitations/lessons have no row in listening_history; writing
       // their synthetic IDs would either fail or pollute real completion stats.
       if (!user || isQuranRecitationId(episodeId) || episodeId.startsWith('curated:')) return;
+      const isComplete = completed || completedIdsRef.current.has(episodeId);
+      if (isComplete) completedIdsRef.current.add(episodeId);
       const now = Date.now();
-      if (now - lastSaveRef.current < SAVE_INTERVAL_MS && !completed) return;
+      if (now - lastSaveRef.current < SAVE_INTERVAL_MS && !isComplete) return;
       lastSaveRef.current = now;
 
       const credit = creditListeningSeconds(countedSecondsRef.current.get(episodeId), seconds);
@@ -440,7 +487,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           user_id: user.id,
           episode_id: episodeId,
           progress_seconds: Math.floor(seconds),
-          completed,
+          completed: isComplete,
           updated_at: new Date().toISOString(),
         });
 
@@ -448,11 +495,14 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
       // Credit only the seconds actually listened since the previous save.
       if (secondsListened > 0) {
-        updateStatsOnListen(user.id, episodeId, secondsListened, completed).catch(() => {});
+        updateStatsOnListen(user.id, episodeId, secondsListened, isComplete).catch(() => {});
       }
     },
     [user]
   );
+  // The audio element is created once on mount, so its handlers reach the
+  // latest save function through this ref instead of a stale closure.
+  saveProgressRef.current = saveProgress;
 
   const handleEnded = useCallback(() => {
     if (currentEpisode) {
