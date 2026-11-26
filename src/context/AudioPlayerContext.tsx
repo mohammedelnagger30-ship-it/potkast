@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, useCal
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { updateStatsOnListen } from '@/lib/statsHelper';
+import { creditListeningSeconds } from '@/lib/listeningCredits';
 import { optimizedImageUrl } from '@/lib/imageUrls';
 import { localUrlFor, OFFLINE_AUDIO_PREFIX } from '@/lib/downloads';
 import { isQuranRecitationId } from '@/lib/ahmedArabiQuran';
@@ -429,12 +430,9 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       if (now - lastSaveRef.current < SAVE_INTERVAL_MS && !completed) return;
       lastSaveRef.current = now;
 
-      const wholeSeconds = Math.max(0, Math.floor(seconds));
-      const lastCounted = countedSecondsRef.current.get(episodeId) ?? 0;
-      // A lower position means the episode was replayed from the start, so the
-      // new position itself is the time listened since the last save.
-      const secondsListened = wholeSeconds < lastCounted ? wholeSeconds : wholeSeconds - lastCounted;
-      countedSecondsRef.current.set(episodeId, wholeSeconds);
+      const credit = creditListeningSeconds(countedSecondsRef.current.get(episodeId), seconds);
+      const secondsListened = credit.secondsListened;
+      countedSecondsRef.current.set(episodeId, credit.countedSeconds);
 
       const { error } = await supabase
         .from('listening_history')
