@@ -14,6 +14,8 @@ import {
   unsubscribeFromPush,
   createNotification,
   sendTestPush,
+  getPushPermission,
+  isNativePush,
   NOTIFICATION_TYPE_OPTIONS,
   type NotificationSettings,
   type NotificationType,
@@ -48,14 +50,12 @@ export default function NotificationSettingsPage() {
     setLoading(true);
     let s = await ensureNotificationSettings(user.id);
     const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-    if (s && s.timezone !== browserZone) {
+    if (s && 'timezone' in s && s.timezone !== browserZone) {
       await updateNotificationSettings(user.id, { timezone: browserZone });
       s = { ...s, timezone: browserZone };
     }
     setSettings(s);
-    if ('Notification' in window) {
-      setPushStatus(Notification.permission);
-    }
+    setPushStatus(await getPushPermission());
     setLoading(false);
   }, [user]);
 
@@ -63,8 +63,18 @@ export default function NotificationSettingsPage() {
     loadSettings();
   }, [loadSettings]);
 
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
   const updateSetting = async (key: keyof NotificationSettings, value: any) => {
     if (!user || !settings) return;
+    if (!(key in settings)) {
+      setNotice('حدّث قاعدة البيانات أولاً لتفعيل هذا الإعداد.');
+      return;
+    }
     setSaving(true);
     setSettings({ ...settings, [key]: value });
     await updateNotificationSettings(user.id, { [key]: value } as any);
@@ -82,7 +92,7 @@ export default function NotificationSettingsPage() {
       setSaving(false);
       if (success) {
         setSettings({ ...settings, push_enabled: true });
-        if ('Notification' in window) setPushStatus(Notification.permission);
+        setPushStatus(await getPushPermission());
       }
     }
   };
@@ -125,7 +135,7 @@ export default function NotificationSettingsPage() {
     }
     setNotice(delivered ? 'وصل الإشعار التجريبي إلى جهازك وداخل التطبيق' : 'الإشعار التجريبي ظهر داخل التطبيق فقط — راجع إعداد الـ Push من Supabase');
     setTestSent(true);
-    setTimeout(() => { setTestSent(false); setNotice(null); }, 5000);
+    setTimeout(() => setTestSent(false), 5000);
   };
 
   if (loading) {
@@ -150,7 +160,7 @@ export default function NotificationSettingsPage() {
       <Card className="mb-6">
         <CardHeader
           title="إشعارات الجهاز"
-          subtitle="إشعارات حقيقية على المتصفح أو التطبيق المثبّت، حتى لو كانت الصفحة مغلقة"
+          subtitle="إشعارات حقيقية على الأندرويد والمتصفح والتطبيق المثبّت، حتى لو كانت الصفحة مغلقة"
         />
         <div className="space-y-4">
           <div className="flex items-center justify-between p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/50">
@@ -168,9 +178,9 @@ export default function NotificationSettingsPage() {
                 </p>
                 <p className="text-xs text-neutral-500 dark:text-neutral-400">
                   {pushStatus === 'denied'
-                    ? 'تم رفض الإذن من المتصفح — يرجى تغييره من الإعدادات'
+                    ? 'تم رفض الإذن — فعّله من إعدادات الجهاز أو المتصفح'
                     : settings?.push_enabled
-                    ? 'الإشعارات مفعّلة'
+                    ? `الإشعارات مفعّلة على ${isNativePush() ? 'هذا الجهاز' : 'المتصفح'}`
                     : 'اضغط لتفعيل الإشعارات'}
                 </p>
               </div>
@@ -192,7 +202,7 @@ export default function NotificationSettingsPage() {
             <div className="flex items-start gap-2 p-3 rounded-xl bg-error-50 dark:bg-error-900/20 text-error-600 dark:text-error-400 text-sm">
               <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
               <p>
-                تم رفض إذن الإشعارات في المتصفح. لتشغيلها، افتح إعدادات الموقع واسمح بالإشعارات.
+                تم رفض إذن الإشعارات. لتشغيلها، اسمح بالإشعارات من إعدادات التطبيق أو المتصفح ثم ارجع هنا.
               </p>
             </div>
           )}

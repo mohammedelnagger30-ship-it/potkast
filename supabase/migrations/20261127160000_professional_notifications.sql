@@ -17,6 +17,12 @@ alter table public.notification_settings
   add column if not exists device_token text,
   add column if not exists push_platform text not null default 'web';
 
+alter table public.notification_settings
+  drop constraint if exists notification_settings_reminder_time_check;
+alter table public.notification_settings
+  add constraint notification_settings_reminder_time_check
+  check (reminder_time ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$');
+
 -- The digest used to silently skip users who never opened the settings page.
 insert into public.notification_settings (user_id, reminder_time, timezone)
 select u.id, coalesce(p.reminder_time, '08:00'), 'UTC'
@@ -85,6 +91,7 @@ declare
   v_inserted integer;
   v_subscription jsonb;
   v_platform text;
+  v_device_token text;
 begin
   if not p_force and not exists (
     select 1
@@ -107,15 +114,16 @@ begin
   insert into public.notifications (user_id, type, title, body, link)
   values (p_user_id, p_type, p_title, coalesce(p_body, ''), p_link);
 
-  select push_subscription, push_platform
-  into v_subscription, v_platform
+  select push_subscription, push_platform, device_token
+  into v_subscription, v_platform, v_device_token
   from public.notification_settings
   where user_id = p_user_id;
 
   return jsonb_build_object(
     'success', true,
     'pushSubscription', coalesce(v_subscription, 'null'::jsonb),
-    'pushPlatform', coalesce(v_platform, 'web')
+    'pushPlatform', coalesce(v_platform, 'web'),
+    'deviceToken', coalesce(v_device_token, '')
   );
 end;
 $fn$;
@@ -330,9 +338,8 @@ begin
     updated_at = now();
 
   update public.notification_settings
-  set device_token = null, push_enabled = false, push_subscription = null,
-      last_tip_sent_on = null, last_reminder_sent_on = null,
-      last_streak_notice_on = null, updated_at = now()
+  set device_token = null, push_platform = 'web', push_enabled = false,
+      push_subscription = null, updated_at = now()
   where user_id = p_user_id;
 
   return jsonb_build_object('success', true);

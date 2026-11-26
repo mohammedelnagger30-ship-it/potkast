@@ -10,13 +10,16 @@ import { DownloadProvider } from '@/context/DownloadContext';
 import { ProgressProvider } from '@/context/ProgressContext';
 import { UpdateProvider } from '@/context/UpdateContext';
 import { warmQuickPlayFromCache } from '@/lib/quickPlay';
+import { initializeNativePush, isNativePush } from '@/lib/notifications';
 import './index.css';
 
-if ('serviceWorker' in navigator) {
+if (!isNativePush() && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
+
+void initializeNativePush();
 
 // The inline boot shell owns the very first paint. Hand over only after React
 // has produced a frame so the user never sees an empty #root.

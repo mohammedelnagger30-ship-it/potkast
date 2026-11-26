@@ -6,6 +6,7 @@ import webpush from "npm:web-push@3.6.7";
 const VAPID_PUBLIC_KEY =
   "BGal4dQ87wB16f4-F7jpJGlCfkzpIeKfT5HIaIK3WIDsIeY0dbS0S-SjKtZWJoSubkcOj6QZd220iL04Htndn_Q";
 const VAPID_SUBJECT = "mailto:admin@sada.app";
+const FCM_CHANNEL = "sada-notifications";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,11 +20,23 @@ const DEFAULT_TYPES = [
   "achievement", "new_episode", "app_update", "admin",
 ];
 
+type WebSubscription = {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+};
+
 type Delivery = {
   success: boolean;
   reason?: string;
-  pushSubscription?: { endpoint: string; keys: { p256dh: string; auth: string } } | null;
-  pushPlatform?: string;
+  pushSubscription?: WebSubscription | null;
+  pushPlatform?: string | null;
+  deviceToken?: string | null;
+};
+
+type ServiceAccount = {
+  project_id: string;
+  client_email: string;
+  private_key: string;
 };
 
 function json(body: unknown, status = 200) {
@@ -71,6 +84,95 @@ function isEnabled(setting: any, type: string): boolean {
   return types.includes(type);
 }
 
+function base64UrlEncode(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function pemToBytes(pem: string): Uint8Array {
+  const base64 = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/, "")
+    .replace(/-----END PRIVATE KEY-----/, "")
+    .replace(/\s/g, "");
+  const binary = atob(base64);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+function parseServiceAccount(): ServiceAccount | null {
+  const raw = Deno.env.get("FCM_SERVICE_ACCOUNT");
+  if (!raw) return null;
+  try {
+    const account = JSON.parse(raw) as ServiceAccount;
+    return account.project_id && account.client_email && account.private_key
+      ? account
+      : null;
+  } catch {
+    try {
+      const account = JSON.parse(atob(raw)) as ServiceAccount;
+      return account.project_id && account.client_email && account.private_key
+        ? account
+        : null;
+    } catch {
+      console.error("FCM_SERVICE_ACCOUNT is not valid JSON");
+      return null;
+    }
+  }
+}
+
+let cachedToken: { value: string; expiresAt: number } | null = null;
+
+async function getFcmAccessToken(account: ServiceAccount): Promise<string> {
+  if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) {
+    return cachedToken.value;
+  }
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const header = base64UrlEncode(new TextEncoder().encode(JSON.stringify({
+    alg: "RS256",
+    typ: "JWT",
+  })));
+  const payload = base64UrlEncode(new TextEncoder().encode(JSON.stringify({
+    iss: account.client_email,
+    scope: "https://www.googleapis.com/auth/firebase.messaging",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: issuedAt,
+    exp: issuedAt + 3600,
+  })));
+  const unsigned = `${header}.${payload}`;
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    pemToBytes(account.private_key),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    new TextEncoder().encode(unsigned),
+  );
+  const assertion = `${unsigned}.${base64UrlEncode(new Uint8Array(signature))}`;
+
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`FCM token request failed: ${response.status}`);
+  }
+  const data = await response.json();
+  cachedToken = {
+    value: data.access_token,
+    expiresAt: issuedAt + Number(data.expires_in || 3600),
+  };
+  return cachedToken.value;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -82,12 +184,11 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const privateKey = Deno.env.get("VAPID_PRIVATE_KEY");
-    let pushReady = false;
-    if (privateKey) {
-      webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, privateKey);
-      pushReady = true;
+    const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
+    if (vapidPrivateKey) {
+      webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, vapidPrivateKey);
     }
+    const serviceAccount = parseServiceAccount();
 
     const enqueue = async (
       userId: string, type: string, title: string, body: string,
@@ -109,9 +210,11 @@ Deno.serve(async (req) => {
       return (data as Delivery) || { success: false, reason: "no result" };
     };
 
-    const sendPush = async (delivery: Delivery, title: string, body: string, link: string | null, userId: string) => {
-      const subscription = delivery.pushSubscription;
-      if (!pushReady || !subscription?.endpoint || !subscription?.keys?.p256dh) return false;
+    const deliverWebPush = async (
+      subscription: WebSubscription, title: string, body: string,
+      link: string | null, userId: string,
+    ): Promise<boolean> => {
+      if (!vapidPrivateKey) return false;
       try {
         await webpush.sendNotification(subscription, JSON.stringify({
           title,
@@ -128,10 +231,74 @@ Deno.serve(async (req) => {
             push_enabled: false, push_subscription: null, updated_at: new Date().toISOString(),
           }).eq("user_id", userId);
         } else {
-          console.error("push failed", status || String(err));
+          console.error("Web Push failed", status || String(err));
         }
         return false;
       }
+    };
+
+    const deliverFcmPush = async (
+      deviceToken: string | null | undefined, title: string, body: string,
+      link: string | null, userId: string,
+    ): Promise<boolean> => {
+      if (!deviceToken || !serviceAccount) return false;
+      try {
+        const accessToken = await getFcmAccessToken(serviceAccount);
+        const response = await fetch(
+          `https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              message: {
+                token: deviceToken,
+                notification: { title, body },
+                data: {
+                  url: link || "/notifications",
+                  title,
+                  body,
+                },
+                android: {
+                  ttl: "3600s",
+                  notification: {
+                    channelId: FCM_CHANNEL,
+                    notificationPriority: "PRIORITY_HIGH",
+                    visibility: "PUBLIC",
+                  },
+                },
+              },
+            }),
+          },
+        );
+        if (response.ok) return true;
+        const detail = await response.text();
+        console.error("FCM send failed", response.status, detail.slice(0, 300));
+        if ([400, 401, 403, 404].includes(response.status)) {
+          cachedToken = null;
+          await supabase.from("notification_settings").update({
+            device_token: null, updated_at: new Date().toISOString(),
+          }).eq("user_id", userId);
+        }
+        return false;
+      } catch (err) {
+        console.error("FCM send error", String(err));
+        return false;
+      }
+    };
+
+    const sendPush = async (
+      delivery: Delivery, title: string, body: string, link: string | null, userId: string,
+    ): Promise<boolean> => {
+      const webSent = delivery.pushSubscription
+        ? await deliverWebPush(delivery.pushSubscription, title, body, link, userId)
+        : false;
+      const fcmSent = delivery.deviceToken
+        ? await deliverFcmPush(delivery.deviceToken, title, body, link, userId)
+        : false;
+      return webSent || fcmSent;
     };
 
     const requestBody = await req.json().catch(() => ({}));
@@ -150,8 +317,8 @@ Deno.serve(async (req) => {
         "/notifications", local.localDate, true,
       );
       if (!result.success) return json({ error: result.reason || "failed" }, 500);
-      await sendPush(result, "إشعار تجريبي", "سدى — وصل الإشعار بنجاح", "/notifications", data.user.id);
-      return json({ sent: 1, pushReady });
+      const pushed = await sendPush(result, "إشعار تجريبي", "سدى — وصل الإشعار بنجاح", "/notifications", data.user.id);
+      return json({ sent: 1, pushed, webPush: !!vapidPrivateKey, fcm: !!serviceAccount });
     }
 
     // Scheduled digest. Optional shared secret protects the public endpoint.
@@ -267,12 +434,16 @@ Deno.serve(async (req) => {
       for (const item of pendingPush) {
         const { data: subs } = await supabase
           .from("notification_settings")
-          .select("push_subscription, push_enabled")
+          .select("push_subscription, push_enabled, device_token")
           .eq("user_id", item.user_id)
           .maybeSingle();
-        if (subs?.push_enabled && subs?.push_subscription) {
+        if (subs?.push_enabled) {
           const delivered = await sendPush(
-            { success: true, pushSubscription: subs.push_subscription as any },
+            {
+              success: true,
+              pushSubscription: subs.push_subscription as WebSubscription | null,
+              deviceToken: subs.device_token,
+            },
             item.title, item.body || "", item.link || "/notifications", item.user_id,
           );
           if (delivered) pushCount++;
@@ -281,7 +452,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({ message: "Digest processed", sent: sentCount, push: pushCount, pushReady });
+    return json({
+      message: "Digest processed",
+      sent: sentCount,
+      push: pushCount,
+      webPush: !!vapidPrivateKey,
+      fcm: !!serviceAccount,
+    });
   } catch (err) {
     return json({ error: String(err) }, 500);
   }

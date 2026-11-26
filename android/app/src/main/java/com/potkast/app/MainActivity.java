@@ -4,11 +4,13 @@ import android.content.res.Configuration;
 import android.os.Bundle;
 import android.webkit.WebView;
 
+import com.capacitorjs.plugins.pushnotifications.PushNotificationsPlugin;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(PushNotificationsPlugin.class);
         registerPlugin(UpdatePlugin.class);
         registerPlugin(TextScalePlugin.class);
         registerPlugin(MediaNotificationPlugin.class);
