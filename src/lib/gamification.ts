@@ -107,9 +107,13 @@ export function formatXp(xp: number): string {
 }
 
 export function formatListeningTime(seconds: number): string {
-  if (seconds === 0) return '0 دقيقة';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} دقيقة`;
+  const total = Math.max(0, Math.floor(seconds));
+  if (total === 0) return '0 دقيقة';
+  const minutes = Math.floor(total / 60);
+  const remSeconds = total % 60;
+  // Show the seconds too, so 7:59 is never silently displayed as "7 دقيقة".
+  if (minutes === 0) return `${remSeconds} ثانية`;
+  if (minutes < 60) return remSeconds > 0 ? `${minutes} د ${remSeconds} ث` : `${minutes} دقيقة`;
   const hours = Math.floor(minutes / 60);
   const remMins = minutes % 60;
   if (hours < 24) return remMins > 0 ? `${hours} س ${remMins} د` : `${hours} ساعة`;

@@ -95,12 +95,46 @@ export async function updateStatsOnMissionComplete(
   }
 }
 
+const LISTEN_REMAINDER_KEY = 'nammy:listen-remainder';
+
+/** Keep the sub-minute remainder locally so category minutes add up to whole
+ * minutes instead of dropping every 5-second save or rounding each one up. */
+function readRemainder(key: string): number {
+  try {
+    const raw = localStorage.getItem(LISTEN_REMAINDER_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+    return Number(parsed[key] || 0);
+  } catch {
+    return 0;
+  }
+}
+
+function writeRemainder(key: string, value: number) {
+  try {
+    const raw = localStorage.getItem(LISTEN_REMAINDER_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+    if (value > 0) parsed[key] = value;
+    else delete parsed[key];
+    localStorage.setItem(LISTEN_REMAINDER_KEY, JSON.stringify(parsed));
+  } catch {
+    // A blocked storage API must never break listening stats.
+  }
+}
+
+/**
+ * `secondsListened` is the DELTA since the previous save, not the absolute
+ * playback position. Passing the absolute position here used to add the same
+ * 7 minutes again every 5 seconds, which inflated both admin totals and
+ * category minutes.
+ */
 export async function updateStatsOnListen(
   userId: string,
   episodeId: string,
-  progressSeconds: number,
-  completed: boolean
+  secondsListened: number,
+  _completed: boolean
 ) {
+  const delta = Math.max(0, Math.floor(secondsListened));
+  if (delta === 0) return;
   await ensureUserStats(userId);
 
   // Fetch the episode with its podcast category
@@ -111,9 +145,8 @@ export async function updateStatsOnListen(
     .maybeSingle();
 
   const categoryId = (episode as any)?.podcast?.category_id || null;
-  const minutesListened = Math.floor(progressSeconds / 60);
 
-  // Update total listening seconds
+  // Update total listening seconds by the actual time listened.
   const { data: stats } = await supabase
     .from('user_stats')
     .select('total_listening_seconds')
@@ -121,46 +154,50 @@ export async function updateStatsOnListen(
     .maybeSingle();
 
   if (stats) {
-    // Only add the difference if this is a progress update, or full duration if completed
-    // For simplicity, we add the current progress seconds
-    // (the upsert in listening_history already handles per-episode tracking)
     await supabase
       .from('user_stats')
       .update({
-        total_listening_seconds: stats.total_listening_seconds + Math.floor(progressSeconds) - 0,
+        total_listening_seconds: stats.total_listening_seconds + delta,
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', userId);
   }
 
-  // Update category_progress for listening
-  if (categoryId && minutesListened > 0) {
-    const { data: catProg } = await supabase
-      .from('category_progress')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('category_id', categoryId)
-      .maybeSingle();
+  // Update category_progress for listening with whole minutes only.
+  if (categoryId) {
+    const remainderKey = `${userId}:${categoryId}`;
+    const accumulated = readRemainder(remainderKey) + delta;
+    const minutesToAdd = Math.floor(accumulated / 60);
+    writeRemainder(remainderKey, accumulated % 60);
 
-    if (catProg) {
-      await supabase
+    if (minutesToAdd > 0) {
+      const { data: catProg } = await supabase
         .from('category_progress')
-        .update({
-          minutes_listened: catProg.minutes_listened + minutesListened,
-          updated_at: new Date().toISOString(),
-        })
+        .select('*')
         .eq('user_id', userId)
-        .eq('category_id', categoryId);
-    } else {
-      await supabase
-        .from('category_progress')
-        .insert({
-          user_id: userId,
-          category_id: categoryId,
-          xp: 0,
-          missions_completed: 0,
-          minutes_listened: minutesListened,
-        });
+        .eq('category_id', categoryId)
+        .maybeSingle();
+
+      if (catProg) {
+        await supabase
+          .from('category_progress')
+          .update({
+            minutes_listened: catProg.minutes_listened + minutesToAdd,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', userId)
+          .eq('category_id', categoryId);
+      } else {
+        await supabase
+          .from('category_progress')
+          .insert({
+            user_id: userId,
+            category_id: categoryId,
+            xp: 0,
+            missions_completed: 0,
+            minutes_listened: minutesToAdd,
+          });
+      }
     }
   }
 }

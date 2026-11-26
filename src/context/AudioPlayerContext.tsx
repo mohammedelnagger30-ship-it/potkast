@@ -163,6 +163,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastSaveRef = useRef(0);
+  // Furthest playback position already credited to user_stats for each episode.
+  // Saving the absolute position again on every 5-second tick used to multiply
+  // listening time; only the difference is credited from now on.
+  const countedSecondsRef = useRef(new Map<string, number>());
   const progressRef = useRef(0);
   const lastTimeRenderRef = useRef(0);
   // Incremented whenever the source changes so a slow history lookup can't
@@ -425,6 +429,13 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       if (now - lastSaveRef.current < SAVE_INTERVAL_MS && !completed) return;
       lastSaveRef.current = now;
 
+      const wholeSeconds = Math.max(0, Math.floor(seconds));
+      const lastCounted = countedSecondsRef.current.get(episodeId) ?? 0;
+      // A lower position means the episode was replayed from the start, so the
+      // new position itself is the time listened since the last save.
+      const secondsListened = wholeSeconds < lastCounted ? wholeSeconds : wholeSeconds - lastCounted;
+      countedSecondsRef.current.set(episodeId, wholeSeconds);
+
       const { error } = await supabase
         .from('listening_history')
         .upsert({
@@ -437,8 +448,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
       if (!error) notifyProgressChanged();
 
-      // Update stats tables
-      updateStatsOnListen(user.id, episodeId, Math.floor(seconds), completed).catch(() => {});
+      // Credit only the seconds actually listened since the previous save.
+      if (secondsListened > 0) {
+        updateStatsOnListen(user.id, episodeId, secondsListened, completed).catch(() => {});
+      }
     },
     [user]
   );
@@ -457,6 +470,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       currentEpisodeRef.current = ep;
       if (ep.podcast) currentPodcastRef.current = ep.podcast;
       setCurrentEpisode(ep);
+      countedSecondsRef.current.set(ep.id, 0);
       const local = isLocalAudioUrl(resolveAudioUrl(ep.audio_url, ep.id));
       // When looping/auto-advancing, start episodes from the beginning.
       const source = sourceFor(ep.id, ep.audio_url, 0);
@@ -470,6 +484,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     if (repeatMode === 'one') {
       if (audioRef.current) {
         playTokenRef.current += 1;
+        if (currentEpisode) countedSecondsRef.current.set(currentEpisode.id, 0);
         audioRef.current.currentTime = 0;
         setIsBuffering(true);
         audioRef.current.play().catch(() => setIsPlaying(false));
@@ -490,6 +505,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       } else {
         if (audioRef.current) {
           playTokenRef.current += 1;
+          if (currentEpisode) countedSecondsRef.current.set(currentEpisode.id, 0);
           audioRef.current.currentTime = 0;
           setIsBuffering(true);
           audioRef.current.play().catch(() => setIsPlaying(false));
@@ -548,6 +564,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       // the caller explicitly asks to continue — an implicit remote seek adds
       // a second range request and a visible stall right after the first frame.
       const resumeAt = local ? cachedResumeFor(episode.id) : Math.max(0, resumeSeconds);
+      // Already-listened seconds at the resume point must not be credited twice.
+      countedSecondsRef.current.set(episode.id, Math.floor(resumeAt));
       const source = sourceFor(episode.id, episode.audio_url, resumeAt);
       audio.src = source.url;
       audio.playbackRate = playbackRate;

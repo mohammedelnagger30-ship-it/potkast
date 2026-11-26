@@ -43,7 +43,6 @@ import {
 } from 'recharts';
 import { Layout } from '@/components/layout';
 import { Badge, Button, Card, CardHeader, ProgressBar } from '@/components/ui';
-import { useAuth } from '@/context/AuthContext';
 import { formatListeningTime, getLevelInfo, xpProgressInLevel } from '@/lib/gamification';
 import {
   adminActions,
@@ -140,7 +139,6 @@ function InfoTile({
 }
 
 export default function AdminPage() {
-  const { user } = useAuth();
   const [data, setData] = useState<AdminDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -524,33 +522,6 @@ export default function AdminPage() {
                             className="inline-flex items-center gap-1 text-primary-600 text-xs font-bold hover:underline"
                           >
                             <Eye size={15} /> تفاصيل
-                          </button>
-                          <button
-                            type="button"
-                            title={
-                              u.id === user?.id
-                                ? 'لا يمكنك حذف حسابك أنت'
-                                : u.isAdmin
-                                  ? 'لا يمكن حذف حساب أدمن'
-                                  : `حذف ${u.email}`
-                            }
-                            disabled={!!busy || u.id === user?.id || u.isAdmin}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (!window.confirm(`سيتم حذف حساب ${u.email} وكل بياناته نهائياً. لا يمكن التراجع. متابعة؟`)) return;
-                              void runAction(`delete-${u.id}`, async () => {
-                                await adminActions.deleteUser(u.id);
-                                return `تم حذف حساب ${u.email}`;
-                              });
-                            }}
-                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                            aria-label={`حذف ${u.email}`}
-                          >
-                            {busy === `delete-${u.id}` ? (
-                              <RefreshCw size={14} className="animate-spin" />
-                            ) : (
-                              <Trash2 size={15} />
-                            )}
                           </button>
                         </div>
                       </td>
