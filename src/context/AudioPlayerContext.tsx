@@ -1,8 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from 'react';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import { updateStatsOnListen } from '@/lib/statsHelper';
-import { creditListeningSeconds } from '@/lib/listeningCredits';
+import { recordListeningProgress } from '@/lib/statsHelper';
 import { optimizedImageUrl } from '@/lib/imageUrls';
 import { localUrlFor, OFFLINE_AUDIO_PREFIX } from '@/lib/downloads';
 import { isQuranRecitationId } from '@/lib/ahmedArabiQuran';
@@ -193,10 +191,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastSaveRef = useRef(0);
-  // Furthest playback position already credited to user_stats for each episode.
-  // Saving the absolute position again on every 5-second tick used to multiply
-  // listening time; only the difference is credited from now on.
-  const countedSecondsRef = useRef(new Map<string, number>());
+  // Credit real playback time, not position differences. Seeking or reloading
+  // used to be counted as listening because the old code compared absolute
+  // player positions. A jump that is too large for the elapsed wall time is a
+  // seek and is intentionally ignored.
+  const lastTimeUpdateRef = useRef<{ at: number; position: number } | null>(null);
+  const pendingListenRef = useRef(new Map<string, number>());
   // Once crossed, completion is sticky for the session: later 5-second saves
   // (and replays) must never write `completed: false` over it.
   const completedIdsRef = useRef<Set<string>>(new Set(getCompletedCache()));
@@ -352,9 +352,32 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
     const onTimeUpdate = () => {
       progressRef.current = audio.currentTime;
+
+      // Count only seconds the audio actually advanced while playing. This is
+      // immune to forward/backward seeks, reloads and the phone notification.
+      const episode = currentEpisodeRef.current;
+      if (episode && !audio.paused && !audio.seeking) {
+        const nowPerf = performance.now();
+        const prev = lastTimeUpdateRef.current;
+        if (prev) {
+          const advanced = audio.currentTime - prev.position;
+          const wall = Math.max(0, (nowPerf - prev.at) / 1000);
+          const rate = Math.max(0.25, playbackRateRef.current || 1);
+          const plausible = advanced > 0 && advanced <= Math.max(1.5, wall * rate + 0.75);
+          if (plausible) {
+            pendingListenRef.current.set(
+              episode.id,
+              (pendingListenRef.current.get(episode.id) || 0) + advanced
+            );
+          }
+        }
+        lastTimeUpdateRef.current = { at: nowPerf, position: audio.currentTime };
+      } else {
+        lastTimeUpdateRef.current = null;
+      }
+
       // Mark the episode complete at 90% — no need to wait for `ended`, which
       // some streams never emit. Sticky ref makes this fire exactly once.
-      const episode = currentEpisodeRef.current;
       const total = audio.duration;
       if (episode && Number.isFinite(total) && total > 0
         && !completedIdsRef.current.has(episode.id)
@@ -378,16 +401,22 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       pushNotification(!audio.paused);
     };
     const onPlay = () => {
+      lastTimeUpdateRef.current = { at: performance.now(), position: audio.currentTime };
       setIsPlaying(true);
       pushNotification(true);
     };
     const onPlaying = () => {
+      lastTimeUpdateRef.current = { at: performance.now(), position: audio.currentTime };
       setIsPlaying(true);
       setIsBuffering(false);
       pushNotification(true);
     };
-    const onWaiting = () => setIsBuffering(true);
+    const onWaiting = () => {
+      lastTimeUpdateRef.current = null;
+      setIsBuffering(true);
+    };
     const onPause = () => {
+      lastTimeUpdateRef.current = null;
       setIsPlaying(false);
       setIsBuffering(false);
       pushNotification(false);
@@ -467,35 +496,30 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   }, [volume]);
 
   const saveProgress = useCallback(
-    async (episodeId: string, seconds: number, completed: boolean) => {
+    async (episodeId: string, seconds: number, completed: boolean, force = false) => {
       // Curated recitations/lessons have no row in listening_history; writing
       // their synthetic IDs would either fail or pollute real completion stats.
       if (!user || isQuranRecitationId(episodeId) || episodeId.startsWith('curated:')) return;
       const isComplete = completed || completedIdsRef.current.has(episodeId);
       if (isComplete) completedIdsRef.current.add(episodeId);
       const now = Date.now();
-      if (now - lastSaveRef.current < SAVE_INTERVAL_MS && !isComplete) return;
+      if (!force && now - lastSaveRef.current < SAVE_INTERVAL_MS && !isComplete) return;
       lastSaveRef.current = now;
 
-      const credit = creditListeningSeconds(countedSecondsRef.current.get(episodeId), seconds);
-      const secondsListened = credit.secondsListened;
-      countedSecondsRef.current.set(episodeId, credit.countedSeconds);
+      const pending = pendingListenRef.current.get(episodeId) || 0;
+      const listenedSeconds = Math.floor(pending);
+      if (listenedSeconds > 0) {
+        pendingListenRef.current.set(episodeId, pending - listenedSeconds);
+      }
 
-      const { error } = await supabase
-        .from('listening_history')
-        .upsert({
-          user_id: user.id,
-          episode_id: episodeId,
-          progress_seconds: Math.floor(seconds),
-          completed: isComplete,
-          updated_at: new Date().toISOString(),
-        });
-
-      if (!error) notifyProgressChanged();
-
-      // Credit only the seconds actually listened since the previous save.
-      if (secondsListened > 0) {
-        updateStatsOnListen(user.id, episodeId, secondsListened, isComplete).catch(() => {});
+      try {
+        await recordListeningProgress(episodeId, Math.floor(seconds), listenedSeconds, isComplete);
+        notifyProgressChanged();
+      } catch {
+        // Keep the uncredited seconds so the next save can retry them.
+        if (listenedSeconds > 0) {
+          pendingListenRef.current.set(episodeId, (pendingListenRef.current.get(episodeId) || 0) + listenedSeconds);
+        }
       }
     },
     [user]
@@ -506,7 +530,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
   const handleEnded = useCallback(() => {
     if (currentEpisode) {
-      saveProgress(currentEpisode.id, duration, true);
+      void saveProgress(currentEpisode.id, duration, true, true);
     }
 
     const playAt = (idx: number) => {
@@ -518,7 +542,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       currentEpisodeRef.current = ep;
       if (ep.podcast) currentPodcastRef.current = ep.podcast;
       setCurrentEpisode(ep);
-      countedSecondsRef.current.set(ep.id, 0);
+      pendingListenRef.current.set(ep.id, 0);
+      lastTimeUpdateRef.current = null;
       const local = isLocalAudioUrl(resolveAudioUrl(ep.audio_url, ep.id));
       // When looping/auto-advancing, start episodes from the beginning.
       const source = sourceFor(ep.id, ep.audio_url, 0);
@@ -532,7 +557,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     if (repeatMode === 'one') {
       if (audioRef.current) {
         playTokenRef.current += 1;
-        if (currentEpisode) countedSecondsRef.current.set(currentEpisode.id, 0);
+        if (currentEpisode) pendingListenRef.current.set(currentEpisode.id, 0);
+        lastTimeUpdateRef.current = null;
         audioRef.current.currentTime = 0;
         setIsBuffering(true);
         audioRef.current.play().catch(() => setIsPlaying(false));
@@ -553,7 +579,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       } else {
         if (audioRef.current) {
           playTokenRef.current += 1;
-          if (currentEpisode) countedSecondsRef.current.set(currentEpisode.id, 0);
+          if (currentEpisode) pendingListenRef.current.set(currentEpisode.id, 0);
+          lastTimeUpdateRef.current = null;
           audioRef.current.currentTime = 0;
           setIsBuffering(true);
           audioRef.current.play().catch(() => setIsPlaying(false));
@@ -572,7 +599,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     if (!isPlaying || !currentEpisode) return;
     const interval = setInterval(() => {
       if (audioRef.current && progressRef.current > 0) {
-        saveProgress(currentEpisode.id, progressRef.current, false);
+        void saveProgress(currentEpisode.id, progressRef.current, false);
       }
     }, SAVE_INTERVAL_MS);
     return () => clearInterval(interval);
@@ -591,6 +618,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           audioRef.current.pause();
         }
         return;
+      }
+
+      // Flush any playback time measured for the episode we are leaving.
+      if (currentEpisode) {
+        void saveProgress(currentEpisode.id, progressRef.current, false, true);
       }
 
       currentEpisodeRef.current = episode;
@@ -612,8 +644,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       // the caller explicitly asks to continue — an implicit remote seek adds
       // a second range request and a visible stall right after the first frame.
       const resumeAt = local ? cachedResumeFor(episode.id) : Math.max(0, resumeSeconds);
-      // Already-listened seconds at the resume point must not be credited twice.
-      countedSecondsRef.current.set(episode.id, Math.floor(resumeAt));
+      // Position is resume state only. Credited seconds come from measured
+      // playback, so resuming at 10:00 never adds those 10 minutes again.
+      pendingListenRef.current.set(episode.id, 0);
+      lastTimeUpdateRef.current = null;
       const source = sourceFor(episode.id, episode.audio_url, resumeAt);
       audio.src = source.url;
       audio.playbackRate = playbackRate;
@@ -630,7 +664,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         resumeAfterAudible(audio, resumeAt, isCurrent);
       }
     },
-    [currentEpisode, playbackRate, resumePlayback]
+    [currentEpisode, playbackRate, resumePlayback, saveProgress]
   );
 
   const setCurrentQueue = useCallback((episodes: Episode[]) => {
@@ -654,12 +688,16 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
   const seek = useCallback((time: number) => {
     if (!audioRef.current) return;
+    // A seek is not listening time; drop the interval baseline so the next
+    // timeupdate cannot treat the jump as 10 minutes of playback.
+    lastTimeUpdateRef.current = null;
     audioRef.current.currentTime = time;
     setCurrentTime(time);
   }, []);
 
   const skip = useCallback((seconds: number) => {
     if (!audioRef.current) return;
+    lastTimeUpdateRef.current = null;
     audioRef.current.currentTime = Math.max(0, Math.min(audioRef.current.duration, audioRef.current.currentTime + seconds));
     setCurrentTime(audioRef.current.currentTime);
   }, []);
@@ -767,6 +805,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           break;
         case 'seek':
           try {
+            lastTimeUpdateRef.current = null;
             audio.currentTime = Math.max(0, Math.min(audio.duration || 0, value));
           } catch {
             // Source changed between the tap and the seek.
@@ -786,7 +825,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const onHide = () => {
       if (currentEpisode && audioRef.current && progressRef.current > 0) {
-        saveProgress(currentEpisode.id, progressRef.current, false);
+        void saveProgress(currentEpisode.id, progressRef.current, false, true);
       }
     };
     window.addEventListener('pagehide', onHide);
