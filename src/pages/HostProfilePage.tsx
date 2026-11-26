@@ -54,6 +54,7 @@ import {
   EBRAHIM_HEGAZY_PROGRAMS,
   EBRAHIM_HEGAZY_SLUG,
   EBRAHIM_HEGAZY_SOURCES,
+  EBRAHIM_HEGAZY_VIDEO_LINKS,
   hegazyProgramForEpisode,
   type HegazyProgram,
 } from '@/lib/ebrahimHegazy';
@@ -683,6 +684,7 @@ export default function HostProfilePage() {
           <h2 className="font-extrabold text-neutral-900 dark:text-white mb-2">لقاءات بصوته في برامج أخرى</h2>
           <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
             إبراهيم حجازي ضيف في هذه الحلقات، وليس مقدّمها. كل حلقة كاملة ومنسوبة لبرنامجها الأصلي؛ لا تلاوات قرآنية له في سدى.
+            فيديوهاته على قناته ولقاءاته على يوتيوب روابط خارجية فقط: لا توجد ملفات صوت ثابتة لها، فهي غير قابلة للتشغيل هنا.
           </p>
           <div className="flex flex-wrap gap-2 mt-3">
             {EBRAHIM_HEGAZY_SOURCES.map((source) => (
@@ -695,6 +697,21 @@ export default function HostProfilePage() {
               >
                 <ExternalLink size={14} />
                 {source.label}
+              </a>
+            ))}
+          </div>
+          <p className="text-xs font-bold text-neutral-500 dark:text-neutral-400 mt-4 mb-2">لقاءات فيديو أخرى (خارج سدى)</p>
+          <div className="flex flex-wrap gap-2">
+            {EBRAHIM_HEGAZY_VIDEO_LINKS.map((video) => (
+              <a
+                key={video.url}
+                href={video.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/30 dark:hover:text-primary-400 transition-all"
+              >
+                <Youtube size={14} />
+                {video.label}
               </a>
             ))}
           </div>

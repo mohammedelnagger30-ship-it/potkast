@@ -236,6 +236,27 @@ export const EBRAHIM_HEGAZY_SOURCES = [
   { label: 'سكيوريتي بالعربي', url: 'https://anchor.fm/s/d38680e8/podcast/rss' },
 ];
 
+/**
+ * Interviews/videos published with him that have NO stable direct audio
+ * (YouTube signatures expire), so they are links only — never fake episodes
+ * and never counted in the playable catalogue.
+ */
+export const EBRAHIM_HEGAZY_VIDEO_LINKS = [
+  {
+    label: 'Nakerah #12 — Ebrahim Hegazy',
+    url: 'https://www.youtube.com/watch?v=HU0jet-TeOM',
+    sourceUrl: 'https://nakerah.net/community/media/12-ebrahim-yusuf-hegazy-ex-hackerone-triage-team-jr-manager-deloitte-netherlands.482',
+  },
+  {
+    label: 'Radio Hack — Bug Bounty & Triaging',
+    url: 'https://www.youtube.com/watch?v=52bq5nmHfwI',
+  },
+  {
+    label: 'The AI Voice — مع إبراهيم حجازي',
+    url: 'https://www.youtube.com/watch?v=1sk4L1JEnhw',
+  },
+];
+
 export function hegazyProgramForEpisode(id: string): string {
   const programKey = INTERVIEWS.find((item) => interviewId(item.key) === id)?.program;
   return EBRAHIM_HEGAZY_PROGRAMS.find((program) => program.key === programKey)?.title || '';
