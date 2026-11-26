@@ -545,9 +545,6 @@ export default function AdminPage() {
                       </td>
                       <td className="px-3 py-3 text-neutral-600 dark:text-neutral-300">
                         <span className="font-semibold">{formatListeningTime(lifetimeSeconds(u))}</span>
-                        <span className="block text-[10px] text-neutral-400 mt-0.5">
-                          منذ {dateOnly(reportFor(u)?.firstListenAt ?? u.createdAt)}
-                        </span>
                       </td>
                       <td className="px-3 py-3 text-neutral-600 dark:text-neutral-300">{nf(u.missionsCompleted)}</td>
                       <td className="px-3 py-3 text-xs text-neutral-500">{dateTime(u.lastActiveAt)}</td>

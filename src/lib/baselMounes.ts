@@ -27,9 +27,13 @@ export const BASEL_MOUNES_SOURCE_URL = 'https://t.me/ttbasil';
 export const BASEL_MOUNES_ARCHIVE_URL = 'https://archive.org/details/basil-mounes';
 export const BASEL_MOUNES_QURAN_SOURCE_URL = 'https://archive.org/search?query=basil%20mounes';
 
-export const BASEL_MOUNES_PHOTO =
-  'https://cdn4.telesco.pe/file/CI5VTOPv585fu6hP3s0YCUe3v1gz0FVkejvpy2qkWWCAPg03TJUuWwLnOhVKBvNEuE0EzmEr6VW4iU68BitZ4gW4hYtnfxOolgrgggaFPL8CbfoPHBqJ1UTQ0AH3r2dSShY_-U_vWU3bxk_dq1FOBf6_vfrdjOGuU4pnjqOczkpuQ_LNuBoazWOpSVmilU-_bfTg6WOj0cz5qUnQj1AxlxkO8509vHwVXWrVuy7YWFU4LKKvgmcbi7wuSaMy2JfKcEq2k3IFWGCH3QjoOl0gHwnlKNLiCbkoPgt6oGcW4xh0a5mwVk2IHFJWgE5LoVt8U_zsrUQyQzQTnr0fsrwVVA.jpg';
-const LESSON_COVER = 'https://archive.org/services/img/basel_mo2nes';
+// Official avatar of the "باسل مؤنس" YouTube channel (the channel dedicated to
+// his legacy). Bundled locally because the old Telegram CDN link has expired.
+// Source: https://www.youtube.com/@BaselMoanes/about
+export const BASEL_MOUNES_PHOTO = '/images/basel-mounes-portrait.jpg';
+// The presenter's own verified photograph is used for his profile banner and
+// lesson artwork. Archive item thumbnails stay only for the recitation section.
+const LESSON_COVER = BASEL_MOUNES_PHOTO;
 const QURAN_COVER = 'https://archive.org/services/img/basil-mounes';
 
 export const BASEL_MOUNES_HOST: Host = {
@@ -37,7 +41,7 @@ export const BASEL_MOUNES_HOST: Host = {
   name_ar: 'م. باسل مؤنس',
   slug: BASEL_MOUNES_SLUG,
   photo_url: BASEL_MOUNES_PHOTO,
-  cover_url: QURAN_COVER,
+  cover_url: BASEL_MOUNES_PHOTO,
   title_ar: 'قارئ ومحاضر',
   specialty_ar: 'التدبر والتلاوة — رحمه الله',
   bio_ar:
