@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "130593069985",
+    "project_id": "sada-push",
+    "storage_bucket": "sada-push.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:130593069985:android:753ff3d0b467df6ec449e0",
+        "android_client_info": {
+          "package_name": "com.potkast.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAUcxcYDEcTM9rgx-Wz2HHTqIMcKx_eNpk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

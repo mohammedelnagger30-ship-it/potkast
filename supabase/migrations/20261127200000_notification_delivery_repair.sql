@@ -10,11 +10,24 @@ alter table public.notification_settings
   add column if not exists device_token text,
   add column if not exists push_platform text not null default 'web';
 
+-- The digest Edge Function needs full service_role access to these tables.
+grant all on table public.notification_settings to service_role;
+grant all on table public.notifications to service_role;
+
 alter table public.notification_settings
   drop constraint if exists notification_settings_reminder_time_check;
 alter table public.notification_settings
   add constraint notification_settings_reminder_time_check
   check (reminder_time ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$');
+
+create table if not exists public.app_secrets (
+  name text primary key,
+  value text not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.app_secrets enable row level security;
+revoke all on table public.app_secrets from anon, authenticated;
+grant all on table public.app_secrets to service_role;
 
 create or replace function public.admin_reset_user(p_user_id uuid)
 returns jsonb

@@ -6,8 +6,8 @@ import { awardXp } from '@/lib/statsHelper';
 import { useAuth } from '@/context/AuthContext';
 import type { WheelSpin } from '@/types/features';
 
-// Weight = visual slice size = real probability. The 200-XP prize is a rare
-// jackpot, so it gets a much smaller slice than the everyday rewards.
+// Weight = visual slice size = real probability. The 200-XP prize stays rare
+// but visible: 6 / 110 ≈ 5.5%, not a microscopic sliver.
 const segments = [
   { type: 'xp', amount: 50, label: '+50 نقطة', top: '+50', bottom: 'نقطة', color: '#0D9488', light: '#2DD4BF', icon: Zap, weight: 20 },
   { type: 'tip', amount: 0, label: 'نصيحة خاصة', top: 'نصيحة', bottom: 'خاصة', color: '#D97706', light: '#FBBF24', icon: Lightbulb, weight: 18 },
@@ -16,7 +16,7 @@ const segments = [
   { type: 'xp', amount: 25, label: '+25 نقطة', top: '+25', bottom: 'نقطة', color: '#0284C7', light: '#38BDF8', icon: Zap, weight: 20 },
   { type: 'streak_shield', amount: 1, label: 'درع السلسلة', top: 'درع', bottom: 'السلسلة', color: '#7C3AED', light: '#A78BFA', icon: Shield, weight: 8 },
   { type: 'xp', amount: 75, label: '+75 نقطة', top: '+75', bottom: 'نقطة', color: '#E11D48', light: '#FB7185', icon: Zap, weight: 8 },
-  { type: 'xp', amount: 200, label: '+200 نقطة', top: '+200', bottom: 'نقطة', color: '#B45309', light: '#FCD34D', icon: Sparkles, weight: 2 },
+  { type: 'xp', amount: 200, label: '+200 نقطة', top: '+200', bottom: 'نقطة', color: '#B45309', light: '#FCD34D', icon: Sparkles, weight: 6 },
 ] as const;
 
 const totalWeight = segments.reduce((sum, segment) => sum + segment.weight, 0);

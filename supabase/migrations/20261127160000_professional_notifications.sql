@@ -17,6 +17,10 @@ alter table public.notification_settings
   add column if not exists device_token text,
   add column if not exists push_platform text not null default 'web';
 
+-- The digest Edge Function reads and writes these tables as service_role.
+grant all on table public.notification_settings to service_role;
+grant all on table public.notifications to service_role;
+
 alter table public.notification_settings
   drop constraint if exists notification_settings_reminder_time_check;
 alter table public.notification_settings
@@ -261,8 +265,19 @@ create trigger notify_achievement_event_trigger
 
 -- ---------------------------------------------------------------------------
 -- 4) Cron calls every 5 minutes so the user's chosen HH:MM is respected.
---    Set app.cron_secret and the CRON_SECRET Edge Function secret to lock it.
+--    The shared secret lives in a service-role-only table (never in source)
+--    and must match the CRON_SECRET Edge Function secret.
 -- ---------------------------------------------------------------------------
+
+create table if not exists public.app_secrets (
+  name text primary key,
+  value text not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.app_secrets enable row level security;
+revoke all on table public.app_secrets from anon, authenticated;
+grant all on table public.app_secrets to service_role;
 
 create or replace function public.trigger_daily_digest()
 returns bigint
@@ -270,14 +285,18 @@ language plpgsql
 security definer
 set search_path = public, extensions
 as $digest$
+declare
+  v_cron_secret text;
 begin
+  select value into v_cron_secret from public.app_secrets where name = 'cron_secret';
+
   return net.http_post(
     url := 'https://qmbblyzathrfvyqtisur.supabase.co/functions/v1/daily-digest',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'apikey', 'sb_publishable_kjKBayc9CPDKiZmkG_jSSw_63vi_chU',
       'Authorization', 'Bearer sb_publishable_kjKBayc9CPDKiZmkG_jSSw_63vi_chU',
-      'x-sada-cron-secret', coalesce(current_setting('app.cron_secret', true), '')
+      'x-sada-cron-secret', coalesce(v_cron_secret, current_setting('app.cron_secret', true), '')
     ),
     body := '{}'::jsonb,
     timeout_milliseconds := 10000
