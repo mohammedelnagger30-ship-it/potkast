@@ -14,8 +14,14 @@
 const PROXY_ORIGIN = 'https://wsrv.nl/';
 const MAX_CACHE_ENTRIES = 800;
 // Wikimedia already serves small, well-cached thumbnails and rate-limits the
-// proxy's upstream requests, so pass those URLs through unchanged.
-const DIRECT_IMAGE_HOSTS = new Set(['upload.wikimedia.org', 'graph.facebook.com', 'unavatar.io']);
+// proxy's upstream requests. YouTube avatars are already sized by Google and
+// the proxy can replace them with a blank placeholder, so pass both through.
+const DIRECT_IMAGE_HOSTS = new Set([
+  'upload.wikimedia.org',
+  'graph.facebook.com',
+  'unavatar.io',
+  'yt3.googleusercontent.com',
+]);
 
 export type ImageAspect = 'square' | 'wide';
 
