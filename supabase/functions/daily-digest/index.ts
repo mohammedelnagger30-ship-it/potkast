@@ -50,8 +50,7 @@ Deno.serve(async (req) => {
 
       // 1. Send daily tip
       if (shouldSendTip) {
-        // Find a tip matching the user's categories, or any tip
-        let tipQuery = supabase.from("tips").select("*");
+        let tipSent = false;
 
         if (setting.categories && setting.categories.length > 0) {
           // Get category IDs matching the user's selected categories
@@ -92,24 +91,26 @@ Deno.serve(async (req) => {
                   body: `${tip.text_ar}${tip.author_or_source ? " — " + tip.author_or_source : ""}`,
                 });
                 sentCount++;
-                continue;
+                tipSent = true;
               }
             }
           }
         }
 
-        // Fallback: any tip
-        const { data: allTips } = await supabase.from("tips").select("*");
-        if (allTips && allTips.length > 0) {
-          const idx = today.split("-").reduce((acc, p) => acc + parseInt(p, 10), 0) % allTips.length;
-          const tip = allTips[idx];
-          await supabase.from("notifications").insert({
-            user_id: setting.user_id,
-            type: "tip",
-            title: "نصيحة اليوم",
-            body: `${tip.text_ar}${tip.author_or_source ? " — " + tip.author_or_source : ""}`,
-          });
-          sentCount++;
+        // Fallback: any tip. Do not skip the reminder below when a tip was found.
+        if (!tipSent) {
+          const { data: allTips } = await supabase.from("tips").select("*");
+          if (allTips && allTips.length > 0) {
+            const idx = today.split("-").reduce((acc, p) => acc + parseInt(p, 10), 0) % allTips.length;
+            const tip = allTips[idx];
+            await supabase.from("notifications").insert({
+              user_id: setting.user_id,
+              type: "tip",
+              title: "نصيحة اليوم",
+              body: `${tip.text_ar}${tip.author_or_source ? " — " + tip.author_or_source : ""}`,
+            });
+            sentCount++;
+          }
         }
       }
 
@@ -120,7 +121,7 @@ Deno.serve(async (req) => {
           .select("id, mission:missions(title)")
           .eq("user_id", setting.user_id)
           .eq("assigned_date", today)
-          .eq("status", "assigned");
+          .in("status", ["pending", "in_progress"]);
 
         if (pendingMissions && pendingMissions.length > 0) {
           await supabase.from("notifications").insert({
