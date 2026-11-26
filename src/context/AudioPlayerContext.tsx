@@ -513,7 +513,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        await recordListeningProgress(episodeId, Math.floor(seconds), listenedSeconds, isComplete);
+        await recordListeningProgress(user.id, episodeId, Math.floor(seconds), listenedSeconds, isComplete);
         notifyProgressChanged();
       } catch {
         // Keep the uncredited seconds so the next save can retry them.

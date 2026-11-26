@@ -119,17 +119,40 @@ export async function updateStatsOnMissionComplete(
  * playing — never the difference between two absolute player positions.
  */
 export async function recordListeningProgress(
+  userId: string,
   episodeId: string,
   positionSeconds: number,
   listenedSeconds: number,
   completed: boolean
 ) {
+  const position = Math.max(0, Math.floor(positionSeconds || 0));
+  const seconds = Math.max(0, Math.floor(listenedSeconds || 0));
+
   const { data, error } = await supabase.rpc('record_listening_progress', {
     p_episode_id: episodeId,
-    p_position_seconds: Math.max(0, Math.floor(positionSeconds || 0)),
-    p_listened_seconds: Math.max(0, Math.floor(listenedSeconds || 0)),
+    p_position_seconds: position,
+    p_listened_seconds: seconds,
     p_completed: completed,
   });
-  if (error) throw new Error(error.message);
-  return data as { success: boolean; creditedSeconds: number } | null;
+
+  if (!error) return data as { success: boolean; creditedSeconds: number } | null;
+
+  const rpcMissing = error.code === 'PGRST202' || /could not find|not found|404/i.test(error.message);
+  if (!rpcMissing) throw new Error(error.message);
+
+  // Until the migration is applied, keep resume/completion working. Do NOT
+  // credit seconds through the old path — that is exactly what corrupted the
+  // totals in the first place.
+  const { error: fallbackError } = await supabase
+    .from('listening_history')
+    .upsert({
+      user_id: userId,
+      episode_id: episodeId,
+      progress_seconds: position,
+      completed,
+      updated_at: new Date().toISOString(),
+    });
+
+  if (fallbackError) throw new Error(fallbackError.message);
+  return { success: false, creditedSeconds: 0 };
 }
