@@ -53,16 +53,19 @@ export default function MissionsPage() {
 
     const today = new Date().toISOString().split('T')[0];
 
-    // Check if we already have missions assigned today
+    // Only active daily missions count. Rows from an archived catalogue used
+    // to block new assignments while being invisible in the daily tab.
     const { data: existing } = await supabase
       .from('user_missions')
-      .select('id')
+      .select('id, mission_id, mission:missions(type, difficulty)')
       .eq('user_id', user.id)
       .eq('assigned_date', today);
 
-    if (existing && existing.length > 0) {
-      return [];
-    }
+    const assignedIds = new Set((existing || []).map((row: any) => row.mission_id));
+    const existingDaily = (existing || []).filter((row: any) => row.mission?.type === 'daily');
+    const coveredLevels = new Set(existingDaily.map((row: any) => row.mission?.difficulty));
+
+    if (existingDaily.length >= 3) return [];
 
     setAutoAssigning(true);
 
@@ -83,14 +86,17 @@ export default function MissionsPage() {
     }
 
     // Interest matches first, then the rest as fillers
-    const candidates = [...(allDailyMissions as Mission[])].sort((a, b) => {
-      const aMatch = a.category && interestCategoryNames.includes(a.category.name_ar) ? 0 : 1;
-      const bMatch = b.category && interestCategoryNames.includes(b.category.name_ar) ? 0 : 1;
-      return aMatch - bMatch;
-    });
+    const candidates = (allDailyMissions as Mission[])
+      .filter((m) => !assignedIds.has(m.id))
+      .sort((a, b) => {
+        const aMatch = a.category && interestCategoryNames.includes(a.category.name_ar) ? 0 : 1;
+        const bMatch = b.category && interestCategoryNames.includes(b.category.name_ar) ? 0 : 1;
+        return aMatch - bMatch;
+      });
 
-    // One mission per difficulty level so every day has a balanced set
+    // One mission per missing difficulty level so every day stays balanced
     const pickForLevel = (level: 'easy' | 'medium' | 'hard'): Mission | null => {
+      if (coveredLevels.has(level)) return null;
       const pool = candidates.filter((m) => m.difficulty === level);
       if (pool.length === 0) return null;
       const preferred = pool.filter(
@@ -164,7 +170,9 @@ export default function MissionsPage() {
 
     // Calculate today's stats
     const today = new Date().toISOString().split('T')[0];
-    const todays = deduped.filter((um) => um.assigned_date === today);
+    const todays = deduped.filter(
+      (um) => um.assigned_date === today && um.mission?.type === 'daily'
+    );
     const todaysCompleted = todays.filter((um) => um.status === 'completed');
     const xpEarned = todaysCompleted.reduce((sum, um) => sum + (um.mission?.xp_reward || 0), 0);
     setTodayStats({
@@ -263,7 +271,9 @@ export default function MissionsPage() {
       const today = new Date().toISOString().split('T')[0];
       const completedUm = updated.find((um) => um.id === userMissionId);
       if (completedUm && completedUm.assigned_date === today) {
-        const todays = updated.filter((um) => um.assigned_date === today);
+        const todays = updated.filter(
+          (um) => um.assigned_date === today && um.mission?.type === 'daily'
+        );
         const todaysCompleted = todays.filter((um) => um.status === 'completed');
         const xpEarned = todaysCompleted.reduce((sum, um) => sum + (um.mission?.xp_reward || 0), 0);
         setTodayStats({
@@ -513,6 +523,18 @@ export default function MissionsPage() {
                   ? 'ستظهر مهامك اليومية تلقائياً عند تسجيل الدخول'
                   : 'تصفّح المهام المتاحة وابدأ رحلتك'}
               </p>
+              {activeTab === 'daily' && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="mt-4"
+                  leftIcon={<RefreshCw size={15} />}
+                  disabled={loading || autoAssigning}
+                  onClick={() => void loadUserMissions()}
+                >
+                  تحديث مهام اليوم
+                </Button>
+              )}
             </div>
           )}
         </>
