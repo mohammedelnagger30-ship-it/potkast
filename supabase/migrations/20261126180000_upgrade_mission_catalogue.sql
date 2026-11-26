@@ -123,18 +123,8 @@ grant execute on function public.assign_daily_missions() to authenticated;
 -- ---------------------------------------------------------------------------
 -- 2) New catalogue (60 missions: 30 daily, 18 weekly, 12 challenge)
 -- ---------------------------------------------------------------------------
-drop table if exists pg_temp._new_missions;
-create temp table _new_missions (
-  title text,
-  description text,
-  category_name text,
-  difficulty text,
-  xp_reward integer,
-  duration_minutes integer,
-  type text
-);
-
-insert into _new_missions (title, description, category_name, difficulty, xp_reward, duration_minutes, type)
+-- One statement only: no temp table, so it works on pooled SQL runners.
+with new_missions(title, description, category_name, difficulty, xp_reward, duration_minutes, type) as (
 values
   ('تنفّس بإيقاع ٤-٦ لمدة ٦ دقائق', 'شهيق ٤ ثوانٍ وزفير ٦ ست مرات في الدقيقة. التنفس البطيء ينشّط الجهاز اللاودي ويرفع تباين معدل ضربات القلب (HRV)، المؤشر الفسيولوجي للاسترخاء.', 'روحاني / ديني', 'easy', 40, 6, 'daily'),
   ('اكتب ثلاث نِعم قبل النوم', 'تدوين الامتنان يومياً يرتبط بارتفاع الرفاه النفسي وتقليل أثر التوتر في دراسات الامتنان.', 'روحاني / ديني', 'easy', 30, 5, 'daily'),
@@ -196,36 +186,37 @@ values
   ('تحدي ٣٠ يوماً إعادة تأطير', 'تدريب إعادة التقييم يقلل الاستجابة التوترية ويجعل التفسير البديل أسهل تلقائياً.', 'الصحة النفسية', 'hard', 430, 300, 'challenge'),
   ('تحدي ٦٠ يوماً مشروع تطوعي', 'العمل التطوعي المنظّم يجمع بين الهدف الاجتماعي وتعلّم القيادة تحت قيود واقعية.', 'القيادة', 'hard', 620, 1200, 'challenge'),
   ('تحدي ٣٠ يوماً كود يومي', 'الممارسة اليومية القصيرة مع مراجعة الكود تبني مهارة أسرع من جلسات متفرقة.', 'التقنية', 'hard', 580, 900, 'challenge'),
-  ('تحدي ٤٥ يوماً ساعة بلا شاشات', 'تقليل التحفيز الرقمي المسائي يخفف التشتت ويحسّن جودة النوم؛ البديل المعتاد يعيد بناء الانتباه.', 'الصحة النفسية', 'hard', 500, 1350, 'challenge');
-
--- Refresh existing titles, insert new ones, then archive anything from the old catalogue.
-update public.missions as m
-set description = n.description,
-    category_id = (select id from public.categories where name_ar = n.category_name limit 1),
-    difficulty = n.difficulty,
-    xp_reward = n.xp_reward,
-    duration_minutes = n.duration_minutes,
-    type = n.type
-from _new_missions as n
-where m.title = n.title;
-
-insert into public.missions (title, description, category_id, difficulty, xp_reward, duration_minutes, type)
-select n.title,
-       n.description,
-       (select id from public.categories where name_ar = n.category_name limit 1),
-       n.difficulty,
-       n.xp_reward,
-       n.duration_minutes,
-       n.type
-from _new_missions as n
-where not exists (select 1 from public.missions as m where m.title = n.title);
-
+  ('تحدي ٤٥ يوماً ساعة بلا شاشات', 'تقليل التحفيز الرقمي المسائي يخفف التشتت ويحسّن جودة النوم؛ البديل المعتاد يعيد بناء الانتباه.', 'الصحة النفسية', 'hard', 500, 1350, 'challenge')
+),
+updated as (
+  update public.missions as m
+  set description = n.description,
+      category_id = (select id from public.categories where name_ar = n.category_name limit 1),
+      difficulty = n.difficulty,
+      xp_reward = n.xp_reward,
+      duration_minutes = n.duration_minutes,
+      type = n.type
+  from new_missions as n
+  where m.title = n.title
+  returning m.id
+),
+inserted as (
+  insert into public.missions (title, description, category_id, difficulty, xp_reward, duration_minutes, type)
+  select n.title,
+         n.description,
+         (select id from public.categories where name_ar = n.category_name limit 1),
+         n.difficulty,
+         n.xp_reward,
+         n.duration_minutes,
+         n.type
+  from new_missions as n
+  where not exists (select 1 from public.missions as m where m.title = n.title)
+  returning id
+)
 update public.missions as m
 set type = 'archived'
 where m.type in ('daily', 'weekly', 'challenge')
-  and not exists (select 1 from _new_missions as n where n.title = m.title);
-
-drop table _new_missions;
+  and not exists (select 1 from new_missions as n where n.title = m.title);
 
 -- Assign missions for today with the new balanced levels, immediately and idempotently.
 select public.assign_daily_missions();
