@@ -576,7 +576,7 @@ export default function AdminPage() {
 
       {/* ================= Activity ================= */}
       {tab === 'activity' && (
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0 overflow-x-hidden">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <StatCard icon={Flame} label="نشط اليوم" value={totals.activeToday} tone="warning" />
             <StatCard icon={CalendarDays} label="نشط خلال أسبوع" value={totals.activeWeek} tone="success" />
@@ -586,7 +586,7 @@ export default function AdminPage() {
 
           <Card>
             <CardHeader title="النشاط اليومي" subtitle="آخر 30 يوماً — استماع ومهام ومستخدمون" />
-            <div className="h-72 w-full">
+            <div className="h-72 w-full overflow-hidden">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={activityData} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-neutral-200 dark:text-neutral-800" vertical={false} />
