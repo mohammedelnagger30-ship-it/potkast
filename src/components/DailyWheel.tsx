@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Card, CardHeader, Badge } from '@/components/ui';
 import { Gift, Sparkles, Zap, Lightbulb, Target, Shield } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { awardXp } from '@/lib/statsHelper';
 import { useAuth } from '@/context/AuthContext';
 import type { WheelSpin } from '@/types/features';
 
@@ -77,14 +78,7 @@ export function DailyWheel() {
       }
 
       if (segment.type === 'xp' && segment.amount > 0) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('xp')
-          .eq('id', user.id)
-          .maybeSingle();
-        if (profile) {
-          await supabase.from('profiles').update({ xp: profile.xp + segment.amount }).eq('id', user.id);
-        }
+        await awardXp(user.id, segment.amount);
       }
 
       const { data: spinRecord } = await supabase

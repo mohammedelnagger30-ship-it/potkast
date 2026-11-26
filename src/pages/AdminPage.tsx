@@ -231,7 +231,7 @@ export default function AdminPage() {
     const cells = (value: string | number) => `"${String(value ?? '').replace(/"/g, '""')}"`;
     const header = ['الإيميل', 'الاسم', 'المستوى', 'النقاط', 'السلسلة', 'دقائق الاستماع', 'المهام المكتملة', 'آخر نشاط', 'تاريخ التسجيل'];
     const rows = filteredUsers.map((u) => [
-      u.email, u.name, u.level, u.xp, u.streak,
+      u.email, u.name, getLevelInfo(u.xp).level, u.xp, u.streak,
       Math.round(u.listeningSeconds / 60), u.missionsCompleted,
       dateTime(u.lastActiveAt), dateOnly(u.createdAt),
     ]);
@@ -797,7 +797,7 @@ export default function AdminPage() {
               {/* Progress */}
               <Card className="p-4 sm:p-5">
                 <CardHeader
-                  title={`المستوى ${selected.level} — ${getLevelInfo(selected.xp).title}`}
+                  title={`المستوى ${getLevelInfo(selected.xp).level} — ${getLevelInfo(selected.xp).title}`}
                   subtitle={`${nf(selected.xp)} نقطة`}
                 />
                 <ProgressBar value={xpProgressInLevel(selected.xp).percent} showLabel size="lg" />

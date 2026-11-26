@@ -1,5 +1,18 @@
 import { supabase } from '@/lib/supabase';
-import { levelFromXp } from '@/lib/gamification';
+
+/** Atomically award XP from any source (missions, wheel, learning paths).
+ * The SECURITY DEFINER RPC updates profiles.xp and user_stats together, so
+ * two fast awards can't overwrite each other with a stale read-modify-write. */
+export async function awardXp(userId: string, amount: number) {
+  const safeAmount = Math.max(0, Math.floor(amount || 0));
+  if (safeAmount === 0) return null;
+  const { data, error } = await supabase.rpc('add_xp', {
+    p_user_id: userId,
+    p_amount: safeAmount,
+  });
+  if (error) throw new Error(error.message);
+  return data as { success: boolean; xp: number; level: number };
+}
 
 export async function ensureUserStats(userId: string) {
   const { data } = await supabase
@@ -45,15 +58,13 @@ export async function updateStatsOnMissionComplete(
   }
 
   const newLongest = Math.max(stats.longest_streak, newStreak);
-  const newTotalXp = stats.total_xp + xpReward;
-  const newLevel = levelFromXp(newTotalXp);
   const newMissionsCompleted = stats.missions_completed + 1;
 
+  // XP is awarded atomically by add_xp(), which keeps profiles.xp and
+  // user_stats.total_xp/level in sync. Don't add it a second time here.
   await supabase
     .from('user_stats')
     .update({
-      total_xp: newTotalXp,
-      level: newLevel,
       current_streak: newStreak,
       longest_streak: newLongest,
       last_active_date: today,

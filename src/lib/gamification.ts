@@ -1,17 +1,27 @@
+/** Highest level with a defined title/progress band. */
+export const MAX_LEVEL = 20;
+
 export function levelFromXp(xp: number): number {
-  return Math.floor(Math.sqrt(xp / 50)) + 1;
+  const safeXp = Math.max(0, Math.floor(xp || 0));
+  // One source of truth: every surface caps at the same final level.
+  return Math.min(MAX_LEVEL, Math.floor(Math.sqrt(safeXp / 50)) + 1);
 }
 
 export function xpForLevel(level: number): number {
-  return Math.pow(level - 1, 2) * 50;
+  const capped = Math.min(MAX_LEVEL, Math.max(1, Math.floor(level)));
+  return Math.pow(capped - 1, 2) * 50;
 }
 
 export function xpProgressInLevel(xp: number): { current: number; needed: number; percent: number } {
   const level = levelFromXp(xp);
+  if (level >= MAX_LEVEL) {
+    // Points still count after the cap, but there is no next level to show.
+    return { current: 1, needed: 1, percent: 100 };
+  }
   const levelStart = xpForLevel(level);
   const nextLevel = xpForLevel(level + 1);
   const needed = nextLevel - levelStart;
-  const current = xp - levelStart;
+  const current = Math.max(0, xp - levelStart);
   return {
     current,
     needed,
@@ -49,8 +59,8 @@ const levelTitles: { level: number; title: string; color: string }[] = [
 ];
 
 export function getLevelInfo(xp: number): LevelInfo {
-  const level = Math.min(levelFromXp(xp), 20);
-  const info = levelTitles[level - 1] || levelTitles[0];
+  const level = levelFromXp(xp);
+  const info = levelTitles[level - 1] || levelTitles[levelTitles.length - 1];
   return { level, title: info.title, color: info.color };
 }
 

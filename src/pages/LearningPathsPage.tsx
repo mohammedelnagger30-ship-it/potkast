@@ -8,6 +8,7 @@ import {
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { awardXp } from '@/lib/statsHelper';
 import { pathDifficultyLabels, type LearningPath, type LearningPathStep, type UserPathEnrollment } from '@/types/features';
 
 type StepType = 'podcast' | 'mission' | 'tip' | 'reflection';
@@ -159,8 +160,7 @@ export default function LearningPathsPage() {
         if (error) throw error;
         const { data: step } = await supabase.from('learning_path_steps').select('xp_reward').eq('id', stepId).maybeSingle();
         if (step && step.xp_reward > 0) {
-          const { data: profile } = await supabase.from('profiles').select('xp').eq('id', user.id).maybeSingle();
-          if (profile) await supabase.from('profiles').update({ xp: (profile.xp || 0) + step.xp_reward }).eq('id', user.id);
+          await awardXp(user.id, step.xp_reward);
         }
       }
       await loadPaths();

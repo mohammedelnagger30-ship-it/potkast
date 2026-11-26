@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Target, Flame, CheckCircle2, Zap, RefreshCw, Plus, Clock } from 'lucide-react';
 import { Badge, Button } from '@/components/ui';
-import { updateStatsOnMissionComplete } from '@/lib/statsHelper';
+import { awardXp, updateStatsOnMissionComplete } from '@/lib/statsHelper';
 import {
   type Mission,
   type UserMission,
@@ -231,19 +231,10 @@ export default function MissionsPage() {
       .update({ status: 'completed', completed_at: now, notes: notes || null })
       .eq('id', userMissionId);
 
-    // Award XP to profile
+    // Award XP atomically from a single source of truth.
     const xpReward = umData?.mission?.xp_reward || 0;
     if (xpReward > 0 && user) {
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('xp')
-        .eq('id', user.id)
-        .maybeSingle();
-      const currentXp = prof?.xp || 0;
-      await supabase
-        .from('profiles')
-        .update({ xp: currentXp + xpReward, updated_at: now })
-        .eq('id', user.id);
+      await awardXp(user.id, xpReward);
       refreshProfile();
     }
 
