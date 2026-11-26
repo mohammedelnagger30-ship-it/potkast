@@ -26,6 +26,12 @@ import { moodMeta, type JournalEntry } from '@/types/features';
 type Mood = JournalEntry['mood'];
 type RangeKey = 'all' | 'week' | 'month';
 type LinkOption = { id: string; title: string; podcastId?: string | null };
+type EpisodeRow = {
+  id: string;
+  title: string;
+  podcast_id: string | null;
+  podcast: { id: string; title: string } | { id: string; title: string }[] | null;
+};
 
 type FormState = {
   entry_date: string;
@@ -97,6 +103,15 @@ function computeStreak(dates: string[], today: string): number {
 function firstRelation<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
+}
+
+function toEpisodeOption(row: EpisodeRow): LinkOption {
+  const podcast = firstRelation(row.podcast);
+  return {
+    id: row.id,
+    title: row.title,
+    podcastId: podcast?.id ?? row.podcast_id ?? null,
+  };
 }
 
 function emptyForm(today: string): FormState {
@@ -181,27 +196,64 @@ export default function JournalPage() {
           title: (row as { title: string }).title,
         })),
       );
-      setEpisodes(
-        (episodeResult.data || []).map((row) => {
-          const typed = row as {
-            id: string;
-            title: string;
-            podcast_id: string | null;
-            podcast: { id: string; title: string } | { id: string; title: string }[] | null;
-          };
-          const podcast = firstRelation(typed.podcast);
-          return {
-            id: typed.id,
-            title: typed.title,
-            podcastId: podcast?.id ?? typed.podcast_id ?? null,
-          };
-        }),
-      );
+      setEpisodes((episodeResult.data || []).map((row) => toEpisodeOption(row as EpisodeRow)));
     })();
     return () => {
       cancelled = true;
     };
   }, [user]);
+
+  // Older entries can point at episodes/missions outside the picker limits.
+  useEffect(() => {
+    if (!user) return;
+    const knownMissionIds = new Set(missions.map((item) => item.id));
+    const knownEpisodeIds = new Set(episodes.map((item) => item.id));
+    const missingMissionIds = Array.from(
+      new Set(entries.map((entry) => entry.linked_mission_id).filter((id): id is string => id !== null && !knownMissionIds.has(id))),
+    );
+    const missingEpisodeIds = Array.from(
+      new Set(entries.map((entry) => entry.linked_episode_id).filter((id): id is string => id !== null && !knownEpisodeIds.has(id))),
+    );
+    if (!missingMissionIds.length && !missingEpisodeIds.length) return;
+
+    let cancelled = false;
+    (async () => {
+      const [missionResult, episodeResult] = await Promise.all([
+        missingMissionIds.length
+          ? supabase.from('missions').select('id,title').in('id', missingMissionIds)
+          : null,
+        missingEpisodeIds.length
+          ? supabase.from('episodes').select('id,title,podcast_id,podcast:podcasts(id,title)').in('id', missingEpisodeIds)
+          : null,
+      ]);
+      if (cancelled) return;
+      if (missionResult?.data?.length) {
+        setMissions((current) => {
+          const seen = new Set(current.map((item) => item.id));
+          return [
+            ...current,
+            ...missionResult.data
+              .filter((row) => !seen.has((row as { id: string }).id))
+              .map((row) => ({ id: (row as { id: string }).id, title: (row as { title: string }).title })),
+          ];
+        });
+      }
+      if (episodeResult?.data?.length) {
+        setEpisodes((current) => {
+          const seen = new Set(current.map((item) => item.id));
+          return [
+            ...current,
+            ...episodeResult.data
+              .map((row) => toEpisodeOption(row as EpisodeRow))
+              .filter((item) => !seen.has(item.id)),
+          ];
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [entries, episodes, missions, user]);
 
   useEffect(() => {
     if (!toast) return;
