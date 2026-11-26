@@ -6,16 +6,36 @@ import { awardXp } from '@/lib/statsHelper';
 import { useAuth } from '@/context/AuthContext';
 import type { WheelSpin } from '@/types/features';
 
+// Weight = visual slice size = real probability. The 200-XP prize is a rare
+// jackpot, so it gets a much smaller slice than the everyday rewards.
 const segments = [
-  { type: 'xp', amount: 50, label: '+50 نقطة', top: '+50', bottom: 'نقطة', color: '#0D9488', light: '#2DD4BF', icon: Zap },
-  { type: 'tip', amount: 0, label: 'نصيحة خاصة', top: 'نصيحة', bottom: 'خاصة', color: '#D97706', light: '#FBBF24', icon: Lightbulb },
-  { type: 'xp', amount: 100, label: '+100 نقطة', top: '+100', bottom: 'نقطة', color: '#059669', light: '#34D399', icon: Zap },
-  { type: 'mission', amount: 0, label: 'مهمة مفاجئة', top: 'مهمة', bottom: 'مفاجئة', color: '#EA580C', light: '#FB923C', icon: Target },
-  { type: 'xp', amount: 25, label: '+25 نقطة', top: '+25', bottom: 'نقطة', color: '#0284C7', light: '#38BDF8', icon: Zap },
-  { type: 'streak_shield', amount: 1, label: 'درع السلسلة', top: 'درع', bottom: 'السلسلة', color: '#7C3AED', light: '#A78BFA', icon: Shield },
-  { type: 'xp', amount: 75, label: '+75 نقطة', top: '+75', bottom: 'نقطة', color: '#E11D48', light: '#FB7185', icon: Zap },
-  { type: 'xp', amount: 200, label: '+200 نقطة', top: '+200', bottom: 'نقطة', color: '#B45309', light: '#FCD34D', icon: Sparkles },
+  { type: 'xp', amount: 50, label: '+50 نقطة', top: '+50', bottom: 'نقطة', color: '#0D9488', light: '#2DD4BF', icon: Zap, weight: 20 },
+  { type: 'tip', amount: 0, label: 'نصيحة خاصة', top: 'نصيحة', bottom: 'خاصة', color: '#D97706', light: '#FBBF24', icon: Lightbulb, weight: 18 },
+  { type: 'xp', amount: 100, label: '+100 نقطة', top: '+100', bottom: 'نقطة', color: '#059669', light: '#34D399', icon: Zap, weight: 14 },
+  { type: 'mission', amount: 0, label: 'مهمة مفاجئة', top: 'مهمة', bottom: 'مفاجئة', color: '#EA580C', light: '#FB923C', icon: Target, weight: 16 },
+  { type: 'xp', amount: 25, label: '+25 نقطة', top: '+25', bottom: 'نقطة', color: '#0284C7', light: '#38BDF8', icon: Zap, weight: 20 },
+  { type: 'streak_shield', amount: 1, label: 'درع السلسلة', top: 'درع', bottom: 'السلسلة', color: '#7C3AED', light: '#A78BFA', icon: Shield, weight: 8 },
+  { type: 'xp', amount: 75, label: '+75 نقطة', top: '+75', bottom: 'نقطة', color: '#E11D48', light: '#FB7185', icon: Zap, weight: 8 },
+  { type: 'xp', amount: 200, label: '+200 نقطة', top: '+200', bottom: 'نقطة', color: '#B45309', light: '#FCD34D', icon: Sparkles, weight: 2 },
 ] as const;
+
+const totalWeight = segments.reduce((sum, segment) => sum + segment.weight, 0);
+
+const segmentBounds = segments.map((_, index) => {
+  const before = segments.slice(0, index).reduce((sum, segment) => sum + segment.weight, 0);
+  const start = (before / totalWeight) * 360;
+  const end = ((before + segments[index].weight) / totalWeight) * 360;
+  return { start, end, mid: (start + end) / 2 };
+});
+
+function pickWeightedSegment(): number {
+  let roll = Math.random() * totalWeight;
+  for (let index = 0; index < segments.length; index += 1) {
+    roll -= segments[index].weight;
+    if (roll < 0) return index;
+  }
+  return segments.length - 1;
+}
 
 export function DailyWheel() {
   const { user } = useAuth();
@@ -47,9 +67,8 @@ export function DailyWheel() {
     if (!user || spinning || todaySpin) return;
     setSpinning(true);
 
-    const targetIndex = Math.floor(Math.random() * segments.length);
-    const segAngle = 360 / segments.length;
-    const targetAngle = 360 * 5 + (360 - targetIndex * segAngle - segAngle / 2);
+    const targetIndex = pickWeightedSegment();
+    const targetAngle = 360 * 5 + (360 - segmentBounds[targetIndex].mid);
     setRotation(targetAngle);
 
     setTimeout(async () => {
@@ -103,8 +122,6 @@ export function DailyWheel() {
     }, 4000);
   };
 
-  const segmentAngle = 360 / segments.length;
-
   return (
     <Card className="mb-6">
       <CardHeader
@@ -152,22 +169,23 @@ export function DailyWheel() {
               </defs>
 
               {segments.map((seg, i) => {
-                const startAngle = i * segmentAngle - 90;
-                const endAngle = (i + 1) * segmentAngle - 90;
+                const bound = segmentBounds[i];
+                const startAngle = bound.start - 90;
+                const endAngle = bound.end - 90;
                 const startRad = (startAngle * Math.PI) / 180;
                 const endRad = (endAngle * Math.PI) / 180;
                 const x1 = 100 + 90 * Math.cos(startRad);
                 const y1 = 100 + 90 * Math.sin(startRad);
                 const x2 = 100 + 90 * Math.cos(endRad);
                 const y2 = 100 + 90 * Math.sin(endRad);
-                const midAngle = (startAngle + endAngle) / 2;
-                const midRad = (midAngle * Math.PI) / 180;
+                const midRad = (bound.mid - 90) * Math.PI / 180;
                 const tx = 100 + 56 * Math.cos(midRad);
                 const ty = 100 + 56 * Math.sin(midRad);
+                const largeArc = bound.end - bound.start > 180 ? 1 : 0;
                 return (
                   <g key={i}>
                     <path
-                      d={`M100,100 L${x1},${y1} A90,90 0 0,1 ${x2},${y2} Z`}
+                      d={`M100,100 L${x1},${y1} A90,90 0 ${largeArc},1 ${x2},${y2} Z`}
                       fill={`url(#wheel-seg-${i})`}
                       stroke="rgba(255,255,255,0.8)"
                       strokeWidth="1.4"
@@ -197,7 +215,7 @@ export function DailyWheel() {
 
               {/* Segment ticks */}
               {segments.map((_, i) => {
-                const rad = ((i * segmentAngle - 90) * Math.PI) / 180;
+                const rad = ((segmentBounds[i].start - 90) * Math.PI) / 180;
                 return (
                   <circle
                     key={i}
@@ -217,6 +235,10 @@ export function DailyWheel() {
             </svg>
           </div>
         </div>
+
+        <p className="text-[11px] text-neutral-400 mb-3 text-center">
+          حجم كل قطعة يعادل احتمالها — جائزة الـ ٢٠٠ نقطة نادرة
+        </p>
 
         {todaySpin ? (
           <div className="text-center animate-fade-in-up">
