@@ -48,6 +48,15 @@ import {
   baselCourseForEpisode,
   type BaselCourse,
 } from '@/lib/baselMounes';
+import {
+  EBRAHIM_HEGAZY_EPISODES,
+  EBRAHIM_HEGAZY_HOST,
+  EBRAHIM_HEGAZY_PROGRAMS,
+  EBRAHIM_HEGAZY_SLUG,
+  EBRAHIM_HEGAZY_SOURCES,
+  hegazyProgramForEpisode,
+  type HegazyProgram,
+} from '@/lib/ebrahimHegazy';
 import { useAuth } from '@/context/AuthContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { useProgress } from '@/context/ProgressContext';
@@ -65,7 +74,7 @@ import { formatCount, formatDuration, formatRelativeTime } from '@/types/podcast
 type FlatTab = 'latest' | 'top' | 'series';
 type EpisodeWithPod = Episode & { podcast?: Podcast; courseTitle?: string };
 type PodcastWithCount = Podcast & { episodes_count?: number };
-type PresenterCourse = AhmedCourse | BaselCourse;
+type PresenterCourse = AhmedCourse | BaselCourse | HegazyProgram;
 
 interface ListState {
   items: EpisodeWithPod[];
@@ -99,6 +108,7 @@ const socialLabels: Record<string, string> = {
   telegram: 'تليجرام',
   facebook: 'فيسبوك',
   quran: 'التلاوات',
+  linkedin: 'لينكدإن',
 };
 
 function stripHtml(value: string): string {
@@ -138,9 +148,21 @@ export default function HostProfilePage() {
 
   const hostIsAhmed = host?.slug === AHMED_ARABI_SLUG;
   const hostIsBasel = host?.slug === BASEL_MOUNES_SLUG;
-  const hostIsCurated = hostIsAhmed || hostIsBasel;
-  const presenterCourses: PresenterCourse[] = hostIsBasel ? BASEL_MOUNES_COURSES : AHMED_ARABI_COURSES;
-  const presenterSoloTitle = hostIsBasel ? BASEL_MOUNES_SOLO_TITLE : AHMED_ARABI_SOLO_TITLE;
+  const hostIsHegazy = host?.slug === EBRAHIM_HEGAZY_SLUG;
+  // He has no Quran recitation: only real interviews where he is the guest.
+  const hostIsQuran = hostIsAhmed || hostIsBasel;
+  const hostIsCurated = hostIsQuran || hostIsHegazy;
+  const presenterCourses: PresenterCourse[] = hostIsHegazy
+    ? EBRAHIM_HEGAZY_PROGRAMS
+    : hostIsBasel
+      ? BASEL_MOUNES_COURSES
+      : AHMED_ARABI_COURSES;
+  const presenterSoloTitle = hostIsHegazy
+    ? ''
+    : hostIsBasel ? BASEL_MOUNES_SOLO_TITLE : AHMED_ARABI_SOLO_TITLE;
+  const courseWords = hostIsHegazy
+    ? { one: 'برنامج', many: 'البرامج', empty: 'برامج' }
+    : { one: 'دورة', many: 'الدورات', empty: 'دورات' };
   const quranEpisodes = hostIsBasel ? BASEL_MOUNES_QURAN_EPISODES : AHMED_QURAN_EPISODES;
   const quranPodcast = hostIsBasel ? BASEL_MOUNES_QURAN_PODCAST : AHMED_QURAN_PODCAST;
   const quranSourceUrl = hostIsBasel ? BASEL_MOUNES_QURAN_SOURCE_URL : AHMED_QURAN_SOURCE_URL;
@@ -177,15 +199,17 @@ export default function HostProfilePage() {
         .eq('slug', resolvedSlug)
         .maybeSingle();
 
-      // Both curated presenters must stay usable before/without database rows:
-      // Ahmed's series live inside other shows, and Basel's verified audio is
-      // published on public archives rather than as Sada podcasts.
+      // Curated presenters must stay usable before/without database rows:
+      // Ahmed's series live inside other shows, Basel's audio is on public
+      // archives, and Hegazy's verified interviews are on third-party feeds.
       const fallbackHost =
         resolvedSlug === AHMED_ARABI_SLUG
           ? AHMED_ARABI_HOST
           : resolvedSlug === BASEL_MOUNES_SLUG
             ? BASEL_MOUNES_HOST
-            : null;
+            : resolvedSlug === EBRAHIM_HEGAZY_SLUG
+              ? EBRAHIM_HEGAZY_HOST
+              : null;
       const hostRow = (hostData as Host | null) || fallbackHost;
       const hasDatabaseHost = !!hostData;
       if (!hostRow) {
@@ -194,7 +218,8 @@ export default function HostProfilePage() {
       }
       const isAhmed = hostRow.slug === AHMED_ARABI_SLUG;
       const isBasel = hostRow.slug === BASEL_MOUNES_SLUG;
-      const isCurated = isAhmed || isBasel;
+      const isHegazy = hostRow.slug === EBRAHIM_HEGAZY_SLUG;
+      const isCurated = isAhmed || isBasel || isHegazy;
       // The curated list works before the SQL migration is applied. Once the
       // episode_credits table exists, it becomes the source of truth and can
       // include future verified appearances without another app release.
@@ -240,7 +265,11 @@ export default function HostProfilePage() {
         ids = pods.map((p) => p.id);
         total = pods.reduce((sum, p) => sum + (p.episodes_count || 0), 0);
       } else {
-        total = isAhmed ? ahmedIds.length : BASEL_MOUNES_EPISODES.length;
+        total = isAhmed
+          ? ahmedIds.length
+          : isBasel
+            ? BASEL_MOUNES_EPISODES.length
+            : EBRAHIM_HEGAZY_EPISODES.length;
       }
 
       if (cancelled) return;
@@ -281,6 +310,13 @@ export default function HostProfilePage() {
           firstItems = BASEL_MOUNES_EPISODES.map((ep) => ({
             ...ep,
             courseTitle: baselCourseForEpisode(ep.id),
+          }));
+        } else if (isHegazy) {
+          // Real interviews where he is the named guest. Each row keeps the
+          // original show so no other presenter's programme is relabelled.
+          firstItems = EBRAHIM_HEGAZY_EPISODES.map((ep) => ({
+            ...ep,
+            courseTitle: hegazyProgramForEpisode(ep.id),
           }));
         } else if (ids.length > 0) {
           const { data: epData } = await supabase
@@ -572,12 +608,12 @@ export default function HostProfilePage() {
           </div>
 
           {/* Stats row */}
-          <div className={`grid gap-2 mt-5 ${hostIsCurated ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-4'}`}>
+          <div className={`grid gap-2 mt-5 ${hostIsQuran ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : hostIsCurated ? 'grid-cols-3' : 'grid-cols-4'}`}>
             {[
               { icon: Users, value: formatCount(host.followers_count), label: 'متابع' },
-              { icon: Mic, value: (hostIsCurated ? courses.length : podcasts.length).toString(), label: hostIsCurated ? 'دورات' : 'بودكاست' },
+              { icon: Mic, value: (hostIsCurated ? courses.length : podcasts.length).toString(), label: hostIsCurated ? courseWords.many : 'بودكاست' },
               { icon: Headphones, value: totalEpisodes.toString(), label: 'حلقة' },
-              ...(hostIsCurated
+              ...(hostIsQuran
                 ? [{ icon: BookOpen, value: quranEpisodes.length.toLocaleString('ar-EG'), label: 'تلاوة' }]
                 : []),
               { icon: Play, value: formatCount(totalPlays), label: 'تشغيل' },
@@ -642,7 +678,30 @@ export default function HostProfilePage() {
         </div>
       </div>
 
-      {hostIsCurated && (
+      {hostIsHegazy && (
+        <div className="card-base p-5 mb-6 animate-fade-in-up">
+          <h2 className="font-extrabold text-neutral-900 dark:text-white mb-2">لقاءات بصوته في برامج أخرى</h2>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+            إبراهيم حجازي ضيف في هذه الحلقات، وليس مقدّمها. كل حلقة كاملة ومنسوبة لبرنامجها الأصلي؛ لا تلاوات قرآنية له في سدى.
+          </p>
+          <div className="flex flex-wrap gap-2 mt-3">
+            {EBRAHIM_HEGAZY_SOURCES.map((source) => (
+              <a
+                key={source.url}
+                href={source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/30 dark:hover:text-primary-400 transition-all"
+              >
+                <ExternalLink size={14} />
+                {source.label}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hostIsQuran && (
         <QuranRecitationsSection
           episodes={quranEpisodes}
           recitations={quranRecitations}
@@ -666,7 +725,9 @@ export default function HostProfilePage() {
           <div>
             <h2 className="text-lg lg:text-xl font-extrabold text-neutral-900 dark:text-white">الموجزات</h2>
             <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-              لمحة سريعة عن كل دورة من دورات {name}، من الوصف الأصلي للبودكاست.
+              {hostIsHegazy
+                ? `لمحة سريعة عن كل برنامج ظهر فيه ${name}، من الوصف الأصلي للبودكاست.`
+                : `لمحة سريعة عن كل دورة من دورات ${name}، من الوصف الأصلي للبودكاست.`}
             </p>
           </div>
           <Badge variant="neutral" size="sm">{(hostIsCurated ? courses : podcasts).length} ملخص</Badge>
@@ -705,18 +766,18 @@ export default function HostProfilePage() {
         <div className="mb-4">
           <h2 className="text-lg lg:text-xl font-extrabold text-neutral-900 dark:text-white">المحتوى الكامل</h2>
           <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-            كل الدورات وكل الحلقات كاملة — من غير حذف ولا اختصار، مهما كانت مدة الحلقة (حتى لو ٤ ساعات).
+            كل {courseWords.many} وكل الحلقات كاملة — من غير حذف ولا اختصار، مهما كانت مدة الحلقة (حتى لو ٤ ساعات).
           </p>
         </div>
 
         <div className="flex items-center justify-between gap-3 mb-3">
           <h3 className="font-extrabold text-neutral-800 dark:text-neutral-200">
-            كل الدورات ({(hostIsCurated ? courses : podcasts).length})
+            كل {courseWords.many} ({(hostIsCurated ? courses : podcasts).length})
           </h3>
         </div>
         {hostIsCurated ? (
           courses.length === 0 ? (
-            <EmptyState text="لا توجد دورات لهذا المقدم بعد" />
+            <EmptyState text={`لا توجد ${courseWords.empty} لهذا المقدم بعد`} />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {courses.map((course) => (
@@ -732,7 +793,7 @@ export default function HostProfilePage() {
             </div>
           )
         ) : podcasts.length === 0 ? (
-          <EmptyState text="لا توجد دورات لهذا المقدم بعد" />
+          <EmptyState text={`لا توجد ${courseWords.empty} لهذا المقدم بعد`} />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {podcasts.map((p) => (

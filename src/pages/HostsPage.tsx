@@ -16,6 +16,12 @@ import {
   BASEL_MOUNES_HOST,
   BASEL_MOUNES_SLUG,
 } from '@/lib/baselMounes';
+import {
+  EBRAHIM_HEGAZY_EPISODES,
+  EBRAHIM_HEGAZY_HOST,
+  EBRAHIM_HEGAZY_PROGRAMS,
+  EBRAHIM_HEGAZY_SLUG,
+} from '@/lib/ebrahimHegazy';
 import type { Host } from '@/types/podcast';
 
 type SortOption = 'all' | 'fame' | 'followers' | 'popular' | 'newest' | 'az';
@@ -156,6 +162,25 @@ export default function HostsPage() {
     const baselIndex = mapped.findIndex((h) => h.slug === BASEL_MOUNES_SLUG);
     if (baselIndex >= 0) mapped[baselIndex] = baselStats;
     else mapped.push(baselStats);
+
+    // إبراهيم حجازي appears as a guest in real interviews published by other
+    // shows; his public audio is curated client-side, not imported as a podcast.
+    const hegazyCategory = EBRAHIM_HEGAZY_HOST.category?.name_ar || 'التقنية';
+    const hegazyStats: HostStats = {
+      ...(mapped.find((h) => h.slug === EBRAHIM_HEGAZY_SLUG) || EBRAHIM_HEGAZY_HOST),
+      podcasts_count: EBRAHIM_HEGAZY_PROGRAMS.length,
+      episodes_count: EBRAHIM_HEGAZY_EPISODES.length,
+      avg_rating: 0,
+      categories: [
+        ...new Set([
+          ...(mapped.find((h) => h.slug === EBRAHIM_HEGAZY_SLUG)?.categories || []),
+          hegazyCategory,
+        ]),
+      ],
+    };
+    const hegazyIndex = mapped.findIndex((h) => h.slug === EBRAHIM_HEGAZY_SLUG);
+    if (hegazyIndex >= 0) mapped[hegazyIndex] = hegazyStats;
+    else mapped.push(hegazyStats);
 
     mapped.sort((a, b) => safeNumber(b.followers_count) - safeNumber(a.followers_count));
 

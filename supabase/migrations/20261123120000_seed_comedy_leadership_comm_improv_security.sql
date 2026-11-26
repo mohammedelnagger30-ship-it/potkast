@@ -289,29 +289,10 @@ BEGIN
   END IF;
 
   -- ==================== Ibrahim Hegazy (Cybersecurity) ====================
-  IF NOT EXISTS (SELECT 1 FROM hosts WHERE slug = 'ibrahim-hegazy') THEN
-    INSERT INTO hosts (name_ar, slug, photo_url, cover_url, title_ar, specialty_ar, bio_ar, country, category_id, is_verified, followers_count, social_links)
-    VALUES (
-      'إبراهيم حجازي', 'ibrahim-hegazy',
-      'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&h=400&fit=crop&crop=faces',
-      'https://picsum.photos/seed/ibrahim-hegazy-cover/1200/400',
-      'خبير أمن سيبراني', 'الأمن السيبراني واختبار الاختراق',
-      'إبراهيم حجازي خبير أمن سيبراني مصري، مؤسس مشارك ومدير تقني، معروف بمشاركته في نشر الوعي بالأمن السيبراني، واكتشاف الثغرات، وشرح مخاطر الهجمات الرقمية بشكل مبسط وعملي.',
-      'مصر', v_cat_tech, true, 420000,
-      '{"youtube":"https://www.youtube.com/@EbrahemHegazy","linkedin":"https://www.linkedin.com/in/zigoo0/","website":"https://darkentry.net"}'::jsonb
-    ) RETURNING id INTO v_host_id;
-
-    INSERT INTO podcasts (title, description, host_id, category_id, type, cover_url, audience_level, plays_count, rating_avg)
-    VALUES (
-      'Cybersecurity with Ibrahim Hegazy', 'تبسيط الأمن السيبراني: من الاختراق الأخلاقي إلى حماية الأفراد والشركات من التهديدات الرقمية.',
-      v_host_id, v_cat_tech, 'professional',
-      'https://picsum.photos/seed/pod-ibrahim-hegazy/400/400', 'beginner', 980000, 4.8
-    ) RETURNING id INTO v_pod_id;
-    INSERT INTO episodes (podcast_id, title, description, audio_url, duration_seconds, published_at, plays_count) VALUES
-      (v_pod_id, 'كيف تفكر مثل الهاكر لتحمي نفسك', 'مقدمة عملية لفهم عقلية المهاجم وأهم خطوات الحماية.', v_audio, 2400, now() - interval '20 days', 145000),
-      (v_pod_id, 'Bug Bounty: من أين تبدأ؟', 'خريطة بداية واضحة لدخول مجال اختبار الاختراق ومكافآت الثغرات.', v_audio, 2640, now() - interval '15 days', 132000),
-      (v_pod_id, 'أخطاء شائعة تعرضك للاختراق', 'أخطاء يومية بسيطة قد تفتح بابًا للهجمات الإلكترونية.', v_audio, 2100, now() - interval '10 days', 121000),
-      (v_pod_id, 'مستقبل الأمن السيبراني مع الذكاء الاصطناعي', 'كيف يغير الذكاء الاصطناعي مشهد الهجوم والدفاع السيبراني.', v_audio, 2520, now() - interval '5 days', 118000);
-  END IF;
+  -- DISABLED: this block used a stock Unsplash portrait, a picsum cover, and
+  -- four fake episodes that all pointed to the same unrelated Buzzsprout MP3.
+  -- The real presenter and his five verified interviews are added by
+  -- 20261126120000_add_ibrahim_hegazy_presenter.sql and by the client-side
+  -- curated catalogue in src/lib/ebrahimHegazy.ts. Never restore fake rows.
 
 END $$;
