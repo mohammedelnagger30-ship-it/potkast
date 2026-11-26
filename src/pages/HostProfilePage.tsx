@@ -17,6 +17,7 @@ import {
   Send,
   UserPlus,
   UserCheck,
+  X,
 } from 'lucide-react';
 import { Layout } from '@/components/layout';
 import { Button, Badge, ProgressBar } from '@/components/ui';
@@ -58,6 +59,14 @@ import {
   hegazyProgramForEpisode,
   type HegazyProgram,
 } from '@/lib/ebrahimHegazy';
+import {
+  EBRAHIM_HEGAZY_VIDEOS,
+  EBRAHIM_HEGAZY_YOUTUBE_CHANNEL,
+  youtubeEmbedUrl,
+  youtubeThumbnail,
+  youtubeWatchUrl,
+  type HegazyVideo,
+} from '@/lib/ebrahimHegazyVideos';
 import { useAuth } from '@/context/AuthContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { useProgress } from '@/context/ProgressContext';
@@ -718,6 +727,8 @@ export default function HostProfilePage() {
         </div>
       )}
 
+      {hostIsHegazy && <HegazyVideosSection channelUrl={EBRAHIM_HEGAZY_YOUTUBE_CHANNEL} />}
+
       {hostIsQuran && (
         <QuranRecitationsSection
           episodes={quranEpisodes}
@@ -886,6 +897,132 @@ function EmptyState({ text }: { text: string }) {
       </div>
       <p className="text-neutral-500 dark:text-neutral-400 font-semibold">{text}</p>
     </div>
+  );
+}
+
+/**
+ * Videos published on his own channel. These are YouTube videos, never audio
+ * episodes: playback uses YouTube's official embed player and nothing here
+ * enters the episode counters or listening history.
+ */
+function HegazyVideosSection({ channelUrl }: { channelUrl: string }) {
+  const [active, setActive] = useState<HegazyVideo | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setActive(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [active]);
+
+  return (
+    <section id="videos" className="mb-8 animate-fade-in-up">
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-lg lg:text-xl font-extrabold text-neutral-900 dark:text-white">
+            فيديوهات قناته على يوتيوب
+          </h2>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+            {EBRAHIM_HEGAZY_VIDEOS.length} فيديو من قناته الرسمية @Zigoo0 — تُشغّل من يوتيوب داخل سدى، وليست حلقات صوت.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="neutral" size="sm">{EBRAHIM_HEGAZY_VIDEOS.length} فيديو</Badge>
+          <a
+            href={channelUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/30 dark:hover:text-primary-400 transition-all"
+          >
+            <Youtube size={14} />
+            القناة
+          </a>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {EBRAHIM_HEGAZY_VIDEOS.map((video) => (
+          <button
+            key={video.id}
+            type="button"
+            onClick={() => setActive(video)}
+            className="card-base overflow-hidden text-right hover:shadow-lg transition-all active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            <div className="relative aspect-video bg-neutral-200 dark:bg-neutral-800">
+              <OptimizedImage
+                src={youtubeThumbnail(video.id)}
+                alt={video.title}
+                width={480}
+                aspect="wide"
+                className="w-full h-full object-cover"
+              />
+              <span className="absolute inset-0 flex items-center justify-center bg-black/20">
+                <span className="w-11 h-11 rounded-full bg-black/70 text-white flex items-center justify-center">
+                  <Play size={20} fill="currentColor" />
+                </span>
+              </span>
+            </div>
+            <div className="p-3">
+              <h3 className="text-xs font-bold text-neutral-800 dark:text-neutral-200 leading-relaxed line-clamp-2">
+                {video.title}
+              </h3>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {active && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-6"
+          onClick={() => setActive(null)}
+          role="presentation"
+        >
+          <div
+            className="w-full max-w-4xl bg-neutral-900 rounded-2xl overflow-hidden shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={active.title}
+          >
+            <div className="flex items-start justify-between gap-3 p-3 sm:p-4">
+              <h3 className="font-extrabold text-white text-sm sm:text-base leading-relaxed line-clamp-2">
+                {active.title}
+              </h3>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <a
+                  href={youtubeWatchUrl(active.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 text-white hover:bg-white/20 transition-all"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  يوتيوب
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setActive(null)}
+                  className="w-8 h-8 rounded-lg bg-white/10 text-white hover:bg-white/20 flex items-center justify-center transition-all"
+                  aria-label="إغلاق"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <div className="aspect-video w-full bg-black">
+              <iframe
+                src={youtubeEmbedUrl(active.id)}
+                title={active.title}
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -21,6 +21,7 @@ const DIRECT_IMAGE_HOSTS = new Set([
   'graph.facebook.com',
   'unavatar.io',
   'yt3.googleusercontent.com',
+  'i.ytimg.com',
 ]);
 
 export type ImageAspect = 'square' | 'wide';
