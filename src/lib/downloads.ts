@@ -47,6 +47,7 @@ const localUrls = new Map<string, string>();
 const swCached = new Set<string>();
 
 export const OFFLINE_AUDIO_PREFIX = '/__offline_audio__/';
+const SW_CACHE = 'nammy-audio';
 
 /** CDNs that never send CORS headers — go straight to the service worker cache. */
 const OPAQUE_ONLY_HOSTS = [
@@ -222,7 +223,7 @@ export async function saveDownloadedFile(record: DownloadRecord): Promise<'saved
   let blob = file?.blob;
   if (!blob && record.storage === 'cache' && 'caches' in window) {
     const cache = await window.caches.open(SW_CACHE);
-    const response = await cache.match(swCacheKey(record.audioUrl));
+    const response = await cache.match(`${OFFLINE_AUDIO_PREFIX}${record.episodeId}`);
     if (response) blob = await response.blob();
   }
   if (!blob) return 'unsupported';

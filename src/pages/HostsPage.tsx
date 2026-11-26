@@ -22,6 +22,10 @@ import {
   EBRAHIM_HEGAZY_PROGRAMS,
   EBRAHIM_HEGAZY_SLUG,
 } from '@/lib/ebrahimHegazy';
+import {
+  HESHAM_ESMAT_HOST,
+  HESHAM_ESMAT_SLUG,
+} from '@/lib/heshamEsmat';
 import type { Host } from '@/types/podcast';
 
 type SortOption = 'all' | 'fame' | 'followers' | 'popular' | 'newest' | 'az';
@@ -132,6 +136,7 @@ export default function HostsPage() {
       ...(mapped.find((h) => h.slug === AHMED_ARABI_SLUG) || AHMED_ARABI_HOST),
       podcasts_count: AHMED_ARABI_COURSES.length,
       episodes_count: AHMED_ARABI_EPISODE_IDS.length,
+      total_plays: 0,
       avg_rating: 0,
       categories: [
         ...new Set([
@@ -151,6 +156,7 @@ export default function HostsPage() {
       ...(mapped.find((h) => h.slug === BASEL_MOUNES_SLUG) || BASEL_MOUNES_HOST),
       podcasts_count: BASEL_MOUNES_COURSES.length,
       episodes_count: BASEL_MOUNES_EPISODES.length,
+      total_plays: 0,
       avg_rating: 0,
       categories: [
         ...new Set([
@@ -170,6 +176,7 @@ export default function HostsPage() {
       ...(mapped.find((h) => h.slug === EBRAHIM_HEGAZY_SLUG) || EBRAHIM_HEGAZY_HOST),
       podcasts_count: EBRAHIM_HEGAZY_PROGRAMS.length,
       episodes_count: EBRAHIM_HEGAZY_EPISODES.length,
+      total_plays: 0,
       avg_rating: 0,
       categories: [
         ...new Set([
@@ -181,6 +188,26 @@ export default function HostsPage() {
     const hegazyIndex = mapped.findIndex((h) => h.slug === EBRAHIM_HEGAZY_SLUG);
     if (hegazyIndex >= 0) mapped[hegazyIndex] = hegazyStats;
     else mapped.push(hegazyStats);
+
+    // د. هشام عصمت has a verified YouTube catalogue, but no stable public
+    // audio enclosure. Keep audio counts at zero instead of inventing episodes.
+    const heshamCategory = HESHAM_ESMAT_HOST.category?.name_ar || 'العلوم';
+    const heshamStats: HostStats = {
+      ...(mapped.find((h) => h.slug === HESHAM_ESMAT_SLUG) || HESHAM_ESMAT_HOST),
+      podcasts_count: 0,
+      episodes_count: 0,
+      total_plays: 0,
+      avg_rating: 0,
+      categories: [
+        ...new Set([
+          ...(mapped.find((h) => h.slug === HESHAM_ESMAT_SLUG)?.categories || []),
+          heshamCategory,
+        ]),
+      ],
+    };
+    const heshamIndex = mapped.findIndex((h) => h.slug === HESHAM_ESMAT_SLUG);
+    if (heshamIndex >= 0) mapped[heshamIndex] = heshamStats;
+    else mapped.push(heshamStats);
 
     mapped.sort((a, b) => safeNumber(b.followers_count) - safeNumber(a.followers_count));
 

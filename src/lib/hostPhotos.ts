@@ -1,6 +1,7 @@
 import { AHMED_ARABI_PHOTO } from './ahmedArabi';
 import { BASEL_MOUNES_PHOTO } from './baselMounes';
 import { EBRAHIM_HEGAZY_PHOTO } from './ebrahimHegazy';
+import { HESHAM_ESMAT_PHOTO } from './heshamEsmat';
 
 // Verified portraits that must win over stale artwork imported from RSS feeds.
 const HOST_PHOTO_OVERRIDES: Record<string, string> = {
@@ -13,6 +14,8 @@ const HOST_PHOTO_OVERRIDES: Record<string, string> = {
   'basel-mounes': BASEL_MOUNES_PHOTO,
   // إبراهيم حجازي (Zigoo0) — avatar from his public YouTube channel.
   'ibrahim-hegazy': EBRAHIM_HEGAZY_PHOTO,
+  // د. هشام عصمت — avatar from his public YouTube channel @DrHeshamEsmat.
+  'hesham-esmat': HESHAM_ESMAT_PHOTO,
 };
 
 const HOST_PHOTO_FALLBACKS: Record<string, string> = {

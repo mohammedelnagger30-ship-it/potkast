@@ -15,6 +15,13 @@ interface FavoriteEpisodeRow {
   episode: (Episode & { podcast?: Podcast }) | null;
 }
 
+type MaybeRelation<T> = T | T[] | null | undefined;
+
+function firstRelation<T>(value: MaybeRelation<T>): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
 export default function FavoritesPage() {
   const { user } = useAuth();
   const { currentEpisode, isPlaying, togglePlay, playEpisode } = useAudioPlayer();
@@ -29,8 +36,21 @@ export default function FavoritesPage() {
       supabase.from('favorites').select('podcast_id, created_at, podcast:podcasts(*, category:categories(*), host:hosts(*))').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('episode_favorites').select('created_at, episode:episodes(*, podcast:podcasts(*, category:categories(*), host:hosts(*)))').eq('user_id', user.id).order('created_at', { ascending: false }).limit(200),
     ]);
-    setPodcasts(((podRes.data || []) as Array<{ podcast: Podcast | null }>).map((r) => r.podcast).filter(Boolean) as Podcast[]);
-    setEpisodes((epRes.data || []) as FavoriteEpisodeRow[]);
+    const podcastRows = (podRes.data || []) as unknown as Array<{ podcast: MaybeRelation<Podcast> }>;
+    setPodcasts(podcastRows.map((r) => firstRelation(r.podcast)).filter((p): p is Podcast => !!p));
+
+    const episodeRows = (epRes.data || []) as unknown as Array<{
+      created_at: string;
+      episode: MaybeRelation<Episode & { podcast?: MaybeRelation<Podcast> }>;
+    }>;
+    setEpisodes(
+      episodeRows.map((r) => {
+        const episode = firstRelation(r.episode);
+        if (!episode) return { created_at: r.created_at, episode: null };
+        const podcast = firstRelation(episode.podcast) || undefined;
+        return { created_at: r.created_at, episode: { ...episode, podcast } };
+      })
+    );
     setLoading(false);
   }, [user]);
 

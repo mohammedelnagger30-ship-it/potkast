@@ -67,6 +67,17 @@ import {
   youtubeWatchUrl,
   type HegazyVideo,
 } from '@/lib/ebrahimHegazyVideos';
+import {
+  HESHAM_ESMAT_HOST,
+  HESHAM_ESMAT_SLUG,
+  HESHAM_ESMAT_SOURCES,
+} from '@/lib/heshamEsmat';
+import {
+  HESHAM_ESMAT_VIDEOS,
+  HESHAM_ESMAT_VIDEO_CATEGORIES,
+  HESHAM_ESMAT_YOUTUBE_CHANNEL,
+  type HeshamVideo,
+} from '@/lib/heshamEsmatVideos';
 import { useAuth } from '@/context/AuthContext';
 import { useAudioPlayer } from '@/context/AudioPlayerContext';
 import { useProgress } from '@/context/ProgressContext';
@@ -85,6 +96,7 @@ type FlatTab = 'latest' | 'top' | 'series';
 type EpisodeWithPod = Episode & { podcast?: Podcast; courseTitle?: string };
 type PodcastWithCount = Podcast & { episodes_count?: number };
 type PresenterCourse = AhmedCourse | BaselCourse | HegazyProgram;
+type VideoItem = HegazyVideo | HeshamVideo;
 
 interface ListState {
   items: EpisodeWithPod[];
@@ -94,12 +106,6 @@ interface ListState {
 
 const PAGE_SIZE = 30;
 const BULK_PAGE_SIZE = 500;
-
-// The corrected slug lands in the database with the hosted SQL migration.
-// Until it is run, keep the old link working instead of showing a dead page.
-const SLUG_ALIASES: Record<string, string> = {
-  'saja-aljulaud': 'ibrahim-hegazy',
-};
 
 const socialIcons: Record<string, typeof Youtube> = {
   youtube: Youtube,
@@ -159,18 +165,21 @@ export default function HostProfilePage() {
   const hostIsAhmed = host?.slug === AHMED_ARABI_SLUG;
   const hostIsBasel = host?.slug === BASEL_MOUNES_SLUG;
   const hostIsHegazy = host?.slug === EBRAHIM_HEGAZY_SLUG;
-  // He has no Quran recitation: only real interviews where he is the guest.
+  const hostIsHesham = host?.slug === HESHAM_ESMAT_SLUG;
+  // Only Ahmed and Basel have verified Quran recitations in Sada.
   const hostIsQuran = hostIsAhmed || hostIsBasel;
-  const hostIsCurated = hostIsQuran || hostIsHegazy;
+  const hostIsCurated = hostIsQuran || hostIsHegazy || hostIsHesham;
   const presenterCourses: PresenterCourse[] = hostIsHegazy
     ? EBRAHIM_HEGAZY_PROGRAMS
     : hostIsBasel
       ? BASEL_MOUNES_COURSES
-      : AHMED_ARABI_COURSES;
-  const presenterSoloTitle = hostIsHegazy
+      : hostIsHesham
+        ? []
+        : AHMED_ARABI_COURSES;
+  const presenterSoloTitle = hostIsHegazy || hostIsHesham
     ? ''
     : hostIsBasel ? BASEL_MOUNES_SOLO_TITLE : AHMED_ARABI_SOLO_TITLE;
-  const courseWords = hostIsHegazy
+  const courseWords = hostIsHegazy || hostIsHesham
     ? { one: 'برنامج', many: 'البرامج', empty: 'برامج' }
     : { one: 'دورة', many: 'الدورات', empty: 'دورات' };
   const quranEpisodes = hostIsBasel ? BASEL_MOUNES_QURAN_EPISODES : AHMED_QURAN_EPISODES;
@@ -202,7 +211,7 @@ export default function HostProfilePage() {
       setLoading(true);
       setHost(null);
 
-      const resolvedSlug = SLUG_ALIASES[slug || ''] || slug;
+      const resolvedSlug = slug;
       const { data: hostData } = await supabase
         .from('hosts')
         .select('*, category:categories(*)')
@@ -211,7 +220,8 @@ export default function HostProfilePage() {
 
       // Curated presenters must stay usable before/without database rows:
       // Ahmed's series live inside other shows, Basel's audio is on public
-      // archives, and Hegazy's verified interviews are on third-party feeds.
+      // archives, Hegazy's interviews are on third-party feeds, and Hesham's
+      // verified catalogue is YouTube-only.
       const fallbackHost =
         resolvedSlug === AHMED_ARABI_SLUG
           ? AHMED_ARABI_HOST
@@ -219,7 +229,9 @@ export default function HostProfilePage() {
             ? BASEL_MOUNES_HOST
             : resolvedSlug === EBRAHIM_HEGAZY_SLUG
               ? EBRAHIM_HEGAZY_HOST
-              : null;
+              : resolvedSlug === HESHAM_ESMAT_SLUG
+                ? HESHAM_ESMAT_HOST
+                : null;
       const hostRow = (hostData as Host | null) || fallbackHost;
       const hasDatabaseHost = !!hostData;
       if (!hostRow) {
@@ -229,7 +241,8 @@ export default function HostProfilePage() {
       const isAhmed = hostRow.slug === AHMED_ARABI_SLUG;
       const isBasel = hostRow.slug === BASEL_MOUNES_SLUG;
       const isHegazy = hostRow.slug === EBRAHIM_HEGAZY_SLUG;
-      const isCurated = isAhmed || isBasel || isHegazy;
+      const isHesham = hostRow.slug === HESHAM_ESMAT_SLUG;
+      const isCurated = isAhmed || isBasel || isHegazy || isHesham;
       // The curated list works before the SQL migration is applied. Once the
       // episode_credits table exists, it becomes the source of truth and can
       // include future verified appearances without another app release.
@@ -279,7 +292,9 @@ export default function HostProfilePage() {
           ? ahmedIds.length
           : isBasel
             ? BASEL_MOUNES_EPISODES.length
-            : EBRAHIM_HEGAZY_EPISODES.length;
+            : isHegazy
+              ? EBRAHIM_HEGAZY_EPISODES.length
+              : 0; // هشام عصمت: فيديوهات يوتيوب فقط، بلا حلقات صوت مختلقة.
       }
 
       if (cancelled) return;
@@ -328,6 +343,10 @@ export default function HostProfilePage() {
             ...ep,
             courseTitle: hegazyProgramForEpisode(ep.id),
           }));
+        } else if (isHesham) {
+          // No stable unsigned audio exists for this catalogue. His verified
+          // YouTube videos are shown separately and never become episodes.
+          firstItems = [];
         } else if (ids.length > 0) {
           const { data: epData } = await supabase
             .from('episodes')
@@ -618,11 +637,18 @@ export default function HostProfilePage() {
           </div>
 
           {/* Stats row */}
-          <div className={`grid gap-2 mt-5 ${hostIsQuran ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : hostIsCurated ? 'grid-cols-3' : 'grid-cols-4'}`}>
+          <div className={`grid gap-2 mt-5 ${hostIsQuran ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : hostIsHesham ? 'grid-cols-2 sm:grid-cols-4' : hostIsCurated ? 'grid-cols-3' : 'grid-cols-4'}`}>
             {[
               { icon: Users, value: formatCount(host.followers_count), label: 'متابع' },
-              { icon: Mic, value: (hostIsCurated ? courses.length : podcasts.length).toString(), label: hostIsCurated ? courseWords.many : 'بودكاست' },
-              { icon: Headphones, value: totalEpisodes.toString(), label: 'حلقة' },
+              ...(hostIsHesham
+                ? [
+                    { icon: Youtube, value: HESHAM_ESMAT_VIDEOS.length.toLocaleString('ar-EG'), label: 'فيديو' },
+                    { icon: BookOpen, value: HESHAM_ESMAT_VIDEO_CATEGORIES.length.toString(), label: 'قسم' },
+                  ]
+                : [
+                    { icon: Mic, value: (hostIsCurated ? courses.length : podcasts.length).toString(), label: hostIsCurated ? courseWords.many : 'بودكاست' },
+                    { icon: Headphones, value: totalEpisodes.toString(), label: 'حلقة' },
+                  ]),
               ...(hostIsQuran
                 ? [{ icon: BookOpen, value: quranEpisodes.length.toLocaleString('ar-EG'), label: 'تلاوة' }]
                 : []),
@@ -727,7 +753,49 @@ export default function HostProfilePage() {
         </div>
       )}
 
-      {hostIsHegazy && <HegazyVideosSection channelUrl={EBRAHIM_HEGAZY_YOUTUBE_CHANNEL} />}
+      {hostIsHesham && (
+        <div className="card-base p-5 mb-6 animate-fade-in-up">
+          <h2 className="font-extrabold text-neutral-900 dark:text-white mb-2">مصادر موثّقة ومحتوى بصوته</h2>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+            د. هشام عصمت طبيب ومحاضر مصري يشرح العلوم الطبية الأساسية ويقدّم حلقات في السيرة النبوية.
+            كل ما أضفناه هنا فيديوهات منشورة بصوته على يوتيوب، تُشغّل بمشغّل يوتيوب الرسمي داخل سدى.
+            لم نجد ملفات MP3 ثابتة بترخيص عام باسمه، لذلك لا توجد حلقات صوت مختلقة ولا عدّاد استماع لهذه الفيديوهات.
+          </p>
+          <div className="flex flex-wrap gap-2 mt-3">
+            {HESHAM_ESMAT_SOURCES.map((source) => (
+              <a
+                key={source.url}
+                href={source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/30 dark:hover:text-primary-400 transition-all"
+              >
+                <ExternalLink size={14} />
+                {source.label}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hostIsHegazy && (
+        <YouTubeVideosSection
+          channelUrl={EBRAHIM_HEGAZY_YOUTUBE_CHANNEL}
+          videos={EBRAHIM_HEGAZY_VIDEOS}
+          title="فيديوهات قناته على يوتيوب"
+          description={`${EBRAHIM_HEGAZY_VIDEOS.length} فيديو من قناته الرسمية @Zigoo0 — تُشغّل من يوتيوب داخل سدى، وليست حلقات صوت.`}
+        />
+      )}
+
+      {hostIsHesham && (
+        <YouTubeVideosSection
+          channelUrl={HESHAM_ESMAT_YOUTUBE_CHANNEL}
+          videos={HESHAM_ESMAT_VIDEOS}
+          title="محاضراته ولقاءاته على يوتيوب"
+          description={`${HESHAM_ESMAT_VIDEOS.length} فيديو موثّق بصوته من قناته @DrHeshamEsmat — محاضرات وسلاسل ولقاءات، تُشغّل من يوتيوب داخل سدى وليست حلقات صوت.`}
+          categories={HESHAM_ESMAT_VIDEO_CATEGORIES}
+        />
+      )}
 
       {hostIsQuran && (
         <QuranRecitationsSection
@@ -753,9 +821,11 @@ export default function HostProfilePage() {
           <div>
             <h2 className="text-lg lg:text-xl font-extrabold text-neutral-900 dark:text-white">الموجزات</h2>
             <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-              {hostIsHegazy
-                ? `لمحة سريعة عن كل برنامج ظهر فيه ${name}، من الوصف الأصلي للبودكاست.`
-                : `لمحة سريعة عن كل دورة من دورات ${name}، من الوصف الأصلي للبودكاست.`}
+              {hostIsHesham
+                ? `لا توجد حلقات صوت باسم ${name}؛ محاضراته ولقاءاته فيديوهات في القسم التالي.`
+                : hostIsHegazy
+                  ? `لمحة سريعة عن كل برنامج ظهر فيه ${name}، من الوصف الأصلي للبودكاست.`
+                  : `لمحة سريعة عن كل دورة من دورات ${name}، من الوصف الأصلي للبودكاست.`}
             </p>
           </div>
           <Badge variant="neutral" size="sm">{(hostIsCurated ? courses : podcasts).length} ملخص</Badge>
@@ -901,12 +971,32 @@ function EmptyState({ text }: { text: string }) {
 }
 
 /**
- * Videos published on his own channel. These are YouTube videos, never audio
- * episodes: playback uses YouTube's official embed player and nothing here
- * enters the episode counters or listening history.
+ * Verified presenter videos. These are YouTube videos, never audio episodes:
+ * playback uses YouTube's official embed player and nothing here enters the
+ * episode counters or listening history.
  */
-function HegazyVideosSection({ channelUrl }: { channelUrl: string }) {
-  const [active, setActive] = useState<HegazyVideo | null>(null);
+function YouTubeVideosSection({
+  channelUrl,
+  videos,
+  title,
+  description,
+  categories,
+}: {
+  channelUrl: string;
+  videos: VideoItem[];
+  title: string;
+  description: string;
+  categories?: { key: string; label: string }[];
+}) {
+  const [active, setActive] = useState<VideoItem | null>(null);
+  const [activeCategory, setActiveCategory] = useState('all');
+  const visibleVideos = useMemo(
+    () =>
+      !categories || activeCategory === 'all'
+        ? videos
+        : videos.filter((video) => 'category' in video && video.category === activeCategory),
+    [videos, categories, activeCategory]
+  );
 
   useEffect(() => {
     if (!active) return;
@@ -922,14 +1012,14 @@ function HegazyVideosSection({ channelUrl }: { channelUrl: string }) {
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <div>
           <h2 className="text-lg lg:text-xl font-extrabold text-neutral-900 dark:text-white">
-            فيديوهات قناته على يوتيوب
+            {title}
           </h2>
           <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-            {EBRAHIM_HEGAZY_VIDEOS.length} فيديو من قناته الرسمية @Zigoo0 — تُشغّل من يوتيوب داخل سدى، وليست حلقات صوت.
+            {description}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="neutral" size="sm">{EBRAHIM_HEGAZY_VIDEOS.length} فيديو</Badge>
+          <Badge variant="neutral" size="sm">{visibleVideos.length} فيديو</Badge>
           <a
             href={channelUrl}
             target="_blank"
@@ -942,35 +1032,78 @@ function HegazyVideosSection({ channelUrl }: { channelUrl: string }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {EBRAHIM_HEGAZY_VIDEOS.map((video) => (
+      {categories && categories.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
           <button
-            key={video.id}
             type="button"
-            onClick={() => setActive(video)}
-            className="card-base overflow-hidden text-right hover:shadow-lg transition-all active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-primary-500"
+            onClick={() => setActiveCategory('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              activeCategory === 'all'
+                ? 'bg-primary-600 text-white'
+                : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/30 dark:hover:text-primary-400'
+            }`}
           >
-            <div className="relative aspect-video bg-neutral-200 dark:bg-neutral-800">
-              <OptimizedImage
-                src={youtubeThumbnail(video.id)}
-                alt={video.title}
-                width={480}
-                aspect="wide"
-                className="w-full h-full object-cover"
-              />
-              <span className="absolute inset-0 flex items-center justify-center bg-black/20">
-                <span className="w-11 h-11 rounded-full bg-black/70 text-white flex items-center justify-center">
-                  <Play size={20} fill="currentColor" />
-                </span>
-              </span>
-            </div>
-            <div className="p-3">
-              <h3 className="text-xs font-bold text-neutral-800 dark:text-neutral-200 leading-relaxed line-clamp-2">
-                {video.title}
-              </h3>
-            </div>
+            الكل ({videos.length})
           </button>
-        ))}
+          {categories.map((category) => (
+            <button
+              key={category.key}
+              type="button"
+              onClick={() => setActiveCategory(category.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                activeCategory === category.key
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/30 dark:hover:text-primary-400'
+              }`}
+            >
+              {category.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {visibleVideos.map((video) => {
+          const categoryLabel = 'category' in video
+            ? HESHAM_ESMAT_VIDEO_CATEGORIES.find((c) => c.key === video.category)?.label
+            : undefined;
+          return (
+            <button
+              key={video.id}
+              type="button"
+              onClick={() => setActive(video)}
+              className="card-base overflow-hidden text-right hover:shadow-lg transition-all active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <div className="relative aspect-video bg-neutral-200 dark:bg-neutral-800">
+                <OptimizedImage
+                  src={youtubeThumbnail(video.id)}
+                  alt={video.title}
+                  width={480}
+                  aspect="wide"
+                  className="w-full h-full object-cover"
+                />
+                <span className="absolute inset-0 flex items-center justify-center bg-black/20">
+                  <span className="w-11 h-11 rounded-full bg-black/70 text-white flex items-center justify-center">
+                    <Play size={20} fill="currentColor" />
+                  </span>
+                </span>
+                {'duration' in video && video.duration && (
+                  <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/75 text-[10px] font-bold text-white">
+                    {video.duration}
+                  </span>
+                )}
+              </div>
+              <div className="p-3">
+                <h3 className="text-xs font-bold text-neutral-800 dark:text-neutral-200 leading-relaxed line-clamp-2">
+                  {video.title}
+                </h3>
+                {categoryLabel && (
+                  <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-1">{categoryLabel}</p>
+                )}
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {active && (

@@ -63,6 +63,7 @@ export default function DownloadsPage() {
   const [tab, setTab] = useState<Tab>('saved');
   const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
   const savedBytes = finished.reduce((sum, row) => sum + (row.size || 0), 0);
   const storagePct = storage.quota > 0 ? Math.min(100, (storage.usage / storage.quota) * 100) : 0;

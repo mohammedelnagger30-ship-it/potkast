@@ -43,6 +43,7 @@ import {
 } from 'recharts';
 import { Layout } from '@/components/layout';
 import { Badge, Button, Card, CardHeader, ProgressBar } from '@/components/ui';
+import { useAuth } from '@/context/AuthContext';
 import { formatListeningTime, getLevelInfo, xpProgressInLevel } from '@/lib/gamification';
 import {
   adminActions,
@@ -139,6 +140,7 @@ function InfoTile({
 }
 
 export default function AdminPage() {
+  const { user } = useAuth();
   const [data, setData] = useState<AdminDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
