@@ -9,6 +9,20 @@ export interface Tip {
   type: 'advice' | 'quote' | 'verse' | 'hadith' | 'fact';
 }
 
+export const NOTIFICATION_TYPE_OPTIONS = [
+  { key: 'tip', label: 'النصيحة اليومية' },
+  { key: 'reminder', label: 'تذكير المهام' },
+  { key: 'streak_lost', label: 'تذكير السلسلة' },
+  { key: 'mission_assigned', label: 'مهام جديدة' },
+  { key: 'mission_completed', label: 'إكمال المهام' },
+  { key: 'achievement', label: 'الإنجازات' },
+  { key: 'new_episode', label: 'حلقات جديدة' },
+  { key: 'app_update', label: 'تحديثات التطبيق' },
+  { key: 'admin', label: 'إشعارات سدى' },
+] as const;
+
+export type NotificationType = (typeof NOTIFICATION_TYPE_OPTIONS)[number]['key'];
+
 export interface NotificationSettings {
   user_id: string;
   daily_tip_enabled: boolean;
@@ -16,9 +30,22 @@ export interface NotificationSettings {
   reminder_time: string;
   categories: string[];
   push_enabled: boolean;
+  types_enabled?: NotificationType[] | null;
+  timezone?: string | null;
+  device_token?: string | null;
+  push_platform?: string | null;
 }
 
 const DAILY_TIP_CACHE_KEY = 'sada:daily-tip';
+const VAPID_PUBLIC_KEY =
+  'BGal4dQ87wB16f4-F7jpJGlCfkzpIeKfT5HIaIK3WIDsIeY0dbS0S-SjKtZWJoSubkcOj6QZd220iL04Htndn_Q';
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from(raw, (char) => char.charCodeAt(0));
+}
 
 export async function getDailyTip(user: User, interests: string[]): Promise<Tip | null> {
   // Use a deterministic seed based on the date so the tip is consistent for the day.
@@ -152,26 +179,30 @@ export async function subscribeToPush(userId: string): Promise<boolean> {
   let subscription = await reg.pushManager.getSubscription();
 
   if (!subscription) {
-    // Use a dummy VAPID key — the service worker handles display
-    const vapidKey = 'BEl62iUYgUivxI1mo5pW6q3w2m4O1P2w5k7w3m8O1P2w5k7w3m8O1P2w5k7w3m8O1P2';
     try {
       subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: vapidKey,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
-    } catch {
+    } catch (error) {
+      console.error('Push subscription failed', error);
       return false;
     }
   }
 
-  await supabase
+  const { error } = await supabase
     .from('notification_settings')
     .update({
       push_enabled: true,
+      push_platform: 'web',
       push_subscription: subscription as any,
       updated_at: new Date().toISOString(),
     })
     .eq('user_id', userId);
+  if (error) {
+    console.error('Saving push subscription failed', error.message);
+    return false;
+  }
 
   return true;
 }
@@ -185,10 +216,26 @@ export async function unsubscribeFromPush(userId: string): Promise<void> {
     .from('notification_settings')
     .update({
       push_enabled: false,
+      push_platform: null,
       push_subscription: null,
       updated_at: new Date().toISOString(),
     })
     .eq('user_id', userId);
+}
+
+export async function sendTestPush(): Promise<boolean> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) return false;
+  const { error } = await supabase.functions.invoke('daily-digest', {
+    body: { action: 'test' },
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (error) {
+    console.error('Test push failed', error.message);
+    return false;
+  }
+  return true;
 }
 
 export function showLocalNotification(title: string, body: string): void {

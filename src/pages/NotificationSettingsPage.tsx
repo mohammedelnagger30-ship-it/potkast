@@ -13,7 +13,10 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
   createNotification,
+  sendTestPush,
+  NOTIFICATION_TYPE_OPTIONS,
   type NotificationSettings,
+  type NotificationType,
 } from '@/lib/notifications';
 
 const interestLabels: Record<string, string> = {
@@ -38,11 +41,17 @@ export default function NotificationSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [pushStatus, setPushStatus] = useState<NotificationPermission>('default');
   const [testSent, setTestSent] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const loadSettings = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const s = await ensureNotificationSettings(user.id);
+    let s = await ensureNotificationSettings(user.id);
+    const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    if (s && s.timezone !== browserZone) {
+      await updateNotificationSettings(user.id, { timezone: browserZone });
+      s = { ...s, timezone: browserZone };
+    }
     setSettings(s);
     if ('Notification' in window) {
       setPushStatus(Notification.permission);
@@ -87,16 +96,36 @@ export default function NotificationSettingsPage() {
     updateSetting('categories', updated);
   };
 
+  const isTypeEnabled = (key: NotificationType): boolean => {
+    if (!settings?.types_enabled?.length) return true;
+    return settings.types_enabled.includes(key);
+  };
+
+  const toggleType = (key: NotificationType) => {
+    if (!settings) return;
+    const current: NotificationType[] = settings.types_enabled?.length
+      ? settings.types_enabled
+      : NOTIFICATION_TYPE_OPTIONS.map((option) => option.key);
+    const updated = current.includes(key)
+      ? current.filter((item) => item !== key)
+      : [...current, key];
+    updateSetting('types_enabled', updated);
+  };
+
   const sendTestNotification = async () => {
     if (!user) return;
-    await createNotification(
-      user.id,
-      'tip',
-      'إشعار تجريبي',
-      'تم تفعيل الإشعارات بنجاح! ستصلك نصائح يومية وتذكيرات مهام هنا.'
-    );
+    const delivered = await sendTestPush();
+    if (!delivered) {
+      await createNotification(
+        user.id,
+        'tip',
+        'إشعار تجريبي',
+        'تم تفعيل الإشعارات بنجاح! ستصلك نصائح يومية وتذكيرات مهام هنا.'
+      );
+    }
+    setNotice(delivered ? 'وصل الإشعار التجريبي إلى جهازك وداخل التطبيق' : 'الإشعار التجريبي ظهر داخل التطبيق فقط — راجع إعداد الـ Push من Supabase');
     setTestSent(true);
-    setTimeout(() => setTestSent(false), 3000);
+    setTimeout(() => { setTestSent(false); setNotice(null); }, 5000);
   };
 
   if (loading) {
@@ -111,11 +140,17 @@ export default function NotificationSettingsPage() {
 
   return (
     <Layout title="إعدادات الإشعارات">
+      {notice && (
+        <div className="mb-4 rounded-xl bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-800 px-4 py-3 text-sm font-semibold text-primary-800 dark:text-primary-200">
+          {notice}
+        </div>
+      )}
+
       {/* Push notification card */}
       <Card className="mb-6">
         <CardHeader
-          title="إشعارات المتصفح"
-          subtitle="استلم إشعارات على جهازك حتى عند إغلاق الصفحة"
+          title="إشعارات الجهاز"
+          subtitle="إشعارات حقيقية على المتصفح أو التطبيق المثبّت، حتى لو كانت الصفحة مغلقة"
         />
         <div className="space-y-4">
           <div className="flex items-center justify-between p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/50">
@@ -292,6 +327,35 @@ export default function NotificationSettingsPage() {
         )}
       </Card>
 
+      {/* Per-type preferences */}
+      <Card className="mb-6">
+        <CardHeader
+          title="أنواع الإشعارات"
+          subtitle="اختر بالظبط اللي يهمّك — الباقي مش هيوصلك"
+        />
+        <div className="grid gap-2 sm:grid-cols-2">
+          {NOTIFICATION_TYPE_OPTIONS.map((option) => {
+            const enabled = isTypeEnabled(option.key);
+            return (
+              <button
+                key={option.key}
+                onClick={() => toggleType(option.key)}
+                className="flex items-center justify-between gap-3 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/50 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all"
+              >
+                <span className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">{option.label}</span>
+                <span className={`relative w-10 h-6 rounded-full transition-all flex-shrink-0 ${
+                  enabled ? 'bg-success-500' : 'bg-neutral-300 dark:bg-neutral-600'
+                }`}>
+                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${
+                    enabled ? 'left-1' : 'right-1'
+                  }`} />
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
       {/* Streak reminder info */}
       <Card className="mb-6">
         <CardHeader title="تذكير السلسلة" />
@@ -304,7 +368,7 @@ export default function NotificationSettingsPage() {
               رسائل تشجيعية تلقائية
             </p>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-              إذا انقطعت سلسلتك اليومية، ستصلك رسالة تشجيعية تحفزك للعودة. لا تحتاج تفعيلاً — تعمل تلقائياً.
+              إذا انقطعت سلسلتك اليومية، ستصلك رسالة تشجيعية تحفزك للعودة. تقدر توقفها من «أنواع الإشعارات».
             </p>
           </div>
         </div>
