@@ -157,7 +157,7 @@ export default function HostProfilePage() {
       : '؛ لم يكتمل المصحف بصوتهم، ولا كُمل بفجوات من قارئ آخر.';
   const quranNote = hostIsBasel
     ? `التلاوات المتاحة بصوت م. باسل مؤنس — منفصلة عن دروسه، وغير داخل عدّاد الحلقات. ${quranRecitations.length} من ١١٤ سورة، منها مقاطع جزئية موثّقة بصوته${quranCompletion}`
-    : `التلاوات المتاحة بصوت د. أحمد العربي — منفصلة عن حلقات فاهم وبدون ورق، وغير داخل عدّاد الحلقات. ${quranRecitations.length} من ١١٤ سورة، منها تسجيلات تراويح منشورة باسمه${quranCompletion}`;
+    : `التلاوات المتاحة بصوت د. أحمد العربي — منفصلة عن حلقات فاهم وبدون ورق، وغير داخل عدّاد الحلقات. ${quranRecitations.length} من ١١٤ سورة، منها تسجيلات تراويح منشورة باسمه ومقاطع «ما تيسر» بآياتها في العناوين${quranCompletion}`;
   const reciterName = hostIsBasel ? 'م. باسل مؤنس' : 'د. أحمد العربي';
   const podMap = useMemo(() => new Map(podcasts.map((p) => [p.id, p])), [podcasts]);
   const podIds = useMemo(() => podcasts.map((p) => p.id), [podcasts]);

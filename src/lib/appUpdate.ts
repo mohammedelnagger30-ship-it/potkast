@@ -7,7 +7,7 @@
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 
-export const BUNDLED_VERSION = '1.9.2'; // Keep in sync with android/app/build.gradle versionName.
+export const BUNDLED_VERSION = '1.9.3'; // Keep in sync with android/app/build.gradle versionName.
 
 export const UPDATE_CACHE_KEY = 'sada:update-cache';
 export const UPDATE_DISMISSED_KEY = 'sada:update-dismissed';

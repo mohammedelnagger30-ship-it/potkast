@@ -8,7 +8,10 @@ import type { Episode, Podcast } from '@/types/podcast';
  *    (https://open.spotify.com/show/730UBFWPWLj4cXUEoTK5mS). 33 further surahs
  *    have public, unsigned CloudFront MP3 enclosures and titles/creator tags
  *    naming د.أحمد العربي. Some are tarawih/mosque recordings, so their style
- *    differs from the studio way2quran set.
+ *    differs from the studio way2quran set. The same feed also contains clearly
+ *    labelled «ما تيسر» clips for otherwise missing surahs; those are included
+ *    with their exact ayah ranges in the title and are never presented as a
+ *    complete surah.
  *
  * Every URL below was checked with a byte-range request and returned 200/206.
  * No missing surah is filled by another reciter.
@@ -117,6 +120,19 @@ const EXTRA_SURAHS: Array<[number, string, string]> = [
   [99, 'الزلزلة', '2026-7-3/47c64ce8-87d5-7335-24ca-69268279ade1.mp3'],
 ];
 
+/**
+ * Explicitly partial «ما تيسر» clips for surahs with no complete recording
+ * found. The RSS description states the exact ayah range for each one.
+ * Overlapping clips for the same surah are reduced to the longest one.
+ */
+const PARTIAL_SURAHS: Array<[number, string, string, string]> = [
+  [11, 'هود', 'الآيات ٩٦–١٢٣', '2025-8-16/7857586e-087e-af61-3cd1-6674033981a6.mp3'],
+  [23, 'المؤمنون', 'الآيات ٩٣–١١٨', '2025-8-27/d40a23bd-d4bb-66da-e2bf-83894380b461.mp3'],
+  [24, 'النور', 'الآيات ١–٣٤', '2026-8-26/88806be9-de96-7421-94fd-1b05b8d0e941.m4a'],
+  [28, 'القصص', 'الآيات ٢٠–٢٨', '2025-11-2/79ef99a4-a661-3a4d-90bc-234293f89397.mp3'],
+  [41, 'فصلت', 'الآيات ٤٧–٥٤', '2026-3-5/c4b3f997-f2c7-44b3-d612-0e63d1aa3bab.mp3'],
+];
+
 const recitationId = (surahNumber: number) =>
   `quran:ahmed-arabi:${String(surahNumber).padStart(3, '0')}`;
 
@@ -134,6 +150,13 @@ export const AHMED_QURAN_RECITATIONS: QuranRecitation[] = [
     title: `سورة ${title}`,
     audioUrl: `${AHMED_QURAN_EXTRA_AUDIO_BASE}${path}`,
     sourceUrl: `${AHMED_QURAN_EXTRA_SOURCE_URL}#surah-${surahNumber}`,
+  })),
+  ...PARTIAL_SURAHS.map(([surahNumber, title, range, path]) => ({
+    id: `${recitationId(surahNumber)}-p`,
+    surahNumber,
+    title: `سورة ${title} (ما تيسر: ${range})`,
+    audioUrl: `${AHMED_QURAN_EXTRA_AUDIO_BASE}${path}`,
+    sourceUrl: `${AHMED_QURAN_EXTRA_SOURCE_URL}#partial-${surahNumber}`,
   })),
 ].sort((a, b) => a.surahNumber - b.surahNumber);
 
