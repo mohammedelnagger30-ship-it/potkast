@@ -25,6 +25,7 @@ export const BASEL_MOUNES_HOST_ID = 'd8a9c4f2-7b61-4e30-a95c-6f2e1b7d408a';
 export const BASEL_MOUNES_CATEGORY_ID = 'b6393bd3-deea-403f-88af-f7ae0b34736c';
 export const BASEL_MOUNES_SOURCE_URL = 'https://t.me/ttbasil';
 export const BASEL_MOUNES_ARCHIVE_URL = 'https://archive.org/details/basil-mounes';
+export const BASEL_MOUNES_QURAN_SOURCE_URL = 'https://archive.org/search?query=basil%20mounes';
 
 export const BASEL_MOUNES_PHOTO =
   'https://cdn4.telesco.pe/file/CI5VTOPv585fu6hP3s0YCUe3v1gz0FVkejvpy2qkWWCAPg03TJUuWwLnOhVKBvNEuE0EzmEr6VW4iU68BitZ4gW4hYtnfxOolgrgggaFPL8CbfoPHBqJ1UTQ0AH3r2dSShY_-U_vWU3bxk_dq1FOBf6_vfrdjOGuU4pnjqOczkpuQ_LNuBoazWOpSVmilU-_bfTg6WOj0cz5qUnQj1AxlxkO8509vHwVXWrVuy7YWFU4LKKvgmcbi7wuSaMy2JfKcEq2k3IFWGCH3QjoOl0gHwnlKNLiCbkoPgt6oGcW4xh0a5mwVk2IHFJWgE5LoVt8U_zsrUQyQzQTnr0fsrwVVA.jpg';
@@ -200,9 +201,11 @@ export function baselCourseForEpisode(id: string): string {
 }
 
 /**
- * 70 surahs with a public MP3 by باسل مؤنس on Internet Archive. The numbered
- * item `basil-mounes` supplies 68; two more come from the labelled
- * «المصحف المرتل - باسل مؤنس» item. No other reciter is used to fill gaps.
+ * 84 verified recitations by باسل مؤنس on Internet Archive: the original 70
+ * plus 14 same-voice entries (12 explicitly labelled partial clips and 2
+ * complete surahs) from the item `basil-muannis-recitations`. No gap is filled
+ * by another reciter. Partial ranges are written into every title, and the
+ * Hisham-only file is excluded.
  */
 export interface BaselQuranRecitation {
   id: string;
@@ -217,19 +220,29 @@ type SurahRow = [number, string, string, string];
 const QURAN_SURAHS: SurahRow[] = [
   [1, 'سورة الفاتحة', 'basil-mounes', '001.mp3'],
   [2, 'سورة البقرة', 'basil-mounes', '002.mp3'],
+  [3, 'سورة آل عمران (الآيات ١٣٣–١٧٠)', 'basil-muannis-recitations', '003-02 - سورة آل عمران 133-170.mp3'],
   [4, 'سورة النساء', 'basil-mounes', '004.mp3'],
+  [5, 'سورة المائدة (الآيات ٦٥–٨٥)', 'basil-muannis-recitations', '005-02 - سورة المائدة 65-85.m4a'],
+  [6, 'سورة الأنعام (الآيات ١–٣٥)', 'basil-muannis-recitations', '006-01 - سورة الأنعام 1-35.mp3'],
   [7, 'سورة الأعراف', 'basil-mounes', '007.mp3'],
   [8, 'سورة الأنفال', 'basil-mounes', '008.mp3'],
   [9, 'سورة التوبة', 'basil-mounes', '009.mp3'],
+  [10, 'سورة يونس (الآيات ١٢–١٠٩)', 'basil-muannis-recitations', '010 - سورة يونس 12-109.m4a'],
   [11, 'سورة هود', 'basil-mounes', '011.mp3'],
+  [13, 'سورة الرعد (الآيات ١٨–٢٩)', 'basil-muannis-recitations', '013 - ماتيسر من سورة الرعد 18-29.m4a'],
   [14, 'سورة إبراهيم', 'basil-mounes', '014.mp3'],
   [15, 'سورة الحجر', 'basil-mounes', '015.mp3'],
   [16, 'سورة النحل', 'basil-mounes', '016.mp3'],
+  [17, 'سورة الإسراء (الآيات ١–٥٨)', 'basil-muannis-recitations', '017 - سورة الإسراء 1-58.mp3'],
   [18, 'سورة الكهف', 'basil-mounes', '018.mp3'],
   [20, 'سورة طه', 'basil-mounes', '020.mp3'],
+  [21, 'سورة الأنبياء', 'basil-muannis-recitations', '021 - سورة الأنبياء 1-112.m4a'],
   [22, 'سورة الحج', 'basil-mounes', '022.mp3'],
   [23, 'سورة المؤمنون', 'basil-mounes', '023.mp3'],
+  [24, 'سورة النور (الآيات ٢٧–٦٤)', 'basil-muannis-recitations', '024 - سورة النور 27-64.m4a'],
   [25, 'سورة الفرقان', 'basil-mounes', '025.mp3'],
+  [26, 'سورة الشعراء (الآيات ٥٢–٨٩)', 'basil-muannis-recitations', '026 - ماتيسر من سورة الشعراء 52-89.m4a'],
+  [27, 'سورة النمل (الآيات ٧٨–٩٣)', 'basil-muannis-recitations', '027 - ماتيسر من سورة النمل 78-93.mp3'],
   [28, 'سورة القصص', 'basil-mounes', '028.mp3'],
   [29, 'سورة العنكبوت', 'basil-mounes', '029.mp3'],
   [30, 'سورة الروم', 'basil-mounes', '030.mp3'],
@@ -239,11 +252,15 @@ const QURAN_SURAHS: SurahRow[] = [
   [35, 'سورة فاطر', 'basil-mounes', '035.mp3'],
   [36, 'سورة يس', '20260530_20260530_2140', 'سورة يس-باسل مؤنس.mp3'],
   [37, 'سورة الصافات', 'basil-mounes', '037.mp3'],
+  [39, 'سورة الزمر (الآيات ٢٢–٧٥)', 'basil-muannis-recitations', '039-02 - ماتيسر من سورة الزمر 22-75.m4a'],
+  [41, 'سورة فصلت (الآيات ٣٠–٥٤)', 'basil-muannis-recitations', '041 - ماتيسر من سورة فصلت 30-54.mp3'],
   [42, 'سورة الشورى', 'basil-mounes', '042.mp3'],
   [43, 'سورة الزخرف', 'basil-mounes', '043.mp3'],
   [44, 'سورة الدخان', 'basil-mounes', '044.mp3'],
+  [45, 'سورة الجاثية', 'basil-muannis-recitations', '045 - سورة الجاثية.mp3'],
   [46, 'سورة الأحقاف', 'basil-mounes', '046.mp3'],
   [47, 'سورة محمد', 'basil-mounes', '047.mp3'],
+  [48, 'سورة الفتح (الآيات ١–١٧)', 'basil-muannis-recitations', '048 - ماتيسر من سورة الفتح 1-17.mp3'],
   [50, 'سورة ق', 'basil-mounes', '050.mp3'],
   [52, 'سورة الطور', 'basil-mounes', '052.mp3'],
   [53, 'سورة النجم', 'basil-mounes', '053.mp3'],

@@ -36,13 +36,13 @@ import {
   type AhmedCourse,
 } from '@/lib/ahmedArabi';
 import {
-  BASEL_MOUNES_ARCHIVE_URL,
   BASEL_MOUNES_COURSES,
   BASEL_MOUNES_EPISODES,
   BASEL_MOUNES_HOST,
   BASEL_MOUNES_QURAN_EPISODES,
   BASEL_MOUNES_QURAN_PODCAST,
   BASEL_MOUNES_QURAN_RECITATIONS,
+  BASEL_MOUNES_QURAN_SOURCE_URL,
   BASEL_MOUNES_SLUG,
   BASEL_MOUNES_SOLO_TITLE,
   baselCourseForEpisode,
@@ -54,6 +54,7 @@ import { useProgress } from '@/context/ProgressContext';
 import { supabase } from '@/lib/supabase';
 import {
   AHMED_QURAN_EPISODES,
+  AHMED_QURAN_EXTRA_SOURCE_URL,
   AHMED_QURAN_PODCAST,
   AHMED_QURAN_RECITATIONS,
   AHMED_QURAN_SOURCE_URL,
@@ -142,15 +143,21 @@ export default function HostProfilePage() {
   const presenterSoloTitle = hostIsBasel ? BASEL_MOUNES_SOLO_TITLE : AHMED_ARABI_SOLO_TITLE;
   const quranEpisodes = hostIsBasel ? BASEL_MOUNES_QURAN_EPISODES : AHMED_QURAN_EPISODES;
   const quranPodcast = hostIsBasel ? BASEL_MOUNES_QURAN_PODCAST : AHMED_QURAN_PODCAST;
-  const quranSourceUrl = hostIsBasel ? BASEL_MOUNES_ARCHIVE_URL : AHMED_QURAN_SOURCE_URL;
+  const quranSourceUrl = hostIsBasel ? BASEL_MOUNES_QURAN_SOURCE_URL : AHMED_QURAN_SOURCE_URL;
   const quranSourceLabel = hostIsBasel ? 'Internet Archive' : 'الطريق إلى القرآن';
+  const quranExtraSourceUrl = hostIsBasel ? undefined : AHMED_QURAN_EXTRA_SOURCE_URL;
+  const quranExtraSourceLabel = hostIsBasel ? undefined : 'موجز تلاواته';
   const quranEditionLabel = hostIsBasel ? 'مصحف مرتل' : 'حفص عن عاصم';
   const quranRecitations = hostIsBasel
     ? BASEL_MOUNES_QURAN_RECITATIONS
     : AHMED_QURAN_RECITATIONS;
+  const quranCompletion =
+    quranRecitations.length === 114
+      ? ' — المصحف كامل بصوتهم.'
+      : '؛ لم يكتمل المصحف بصوتهم، ولا كُمل بفجوات من قارئ آخر.';
   const quranNote = hostIsBasel
-    ? `السور المتاحة بصوت م. باسل مؤنس — منفصلة عن دروسه، وغير داخل عدّاد الحلقات. ${BASEL_MOUNES_QURAN_RECITATIONS.length} سورة من أصل ١١٤؛ لا تُكمل بالفجوات من قارئ آخر.`
-    : 'السور المتاحة بصوت د. أحمد العربي — منفصلة عن حلقات فاهم وبدون ورق، وغير داخل عدّاد الحلقات.';
+    ? `التلاوات المتاحة بصوت م. باسل مؤنس — منفصلة عن دروسه، وغير داخل عدّاد الحلقات. ${quranRecitations.length} من ١١٤ سورة، منها مقاطع جزئية موثّقة بصوته${quranCompletion}`
+    : `التلاوات المتاحة بصوت د. أحمد العربي — منفصلة عن حلقات فاهم وبدون ورق، وغير داخل عدّاد الحلقات. ${quranRecitations.length} من ١١٤ سورة، منها تسجيلات تراويح منشورة باسمه${quranCompletion}`;
   const reciterName = hostIsBasel ? 'م. باسل مؤنس' : 'د. أحمد العربي';
   const podMap = useMemo(() => new Map(podcasts.map((p) => [p.id, p])), [podcasts]);
   const podIds = useMemo(() => podcasts.map((p) => p.id), [podcasts]);
@@ -643,6 +650,8 @@ export default function HostProfilePage() {
           note={quranNote}
           sourceUrl={quranSourceUrl}
           sourceLabel={quranSourceLabel}
+          extraSourceUrl={quranExtraSourceUrl}
+          extraSourceLabel={quranExtraSourceLabel}
           editionLabel={quranEditionLabel}
           currentEpisodeId={currentEpisode?.id}
           isPlaying={isPlaying}
@@ -809,6 +818,8 @@ function QuranRecitationsSection({
   note,
   sourceUrl,
   sourceLabel,
+  extraSourceUrl,
+  extraSourceLabel,
   editionLabel,
   currentEpisodeId,
   isPlaying,
@@ -821,6 +832,8 @@ function QuranRecitationsSection({
   note: string;
   sourceUrl: string;
   sourceLabel: string;
+  extraSourceUrl?: string;
+  extraSourceLabel?: string;
   editionLabel: string;
   currentEpisodeId?: string;
   isPlaying: boolean;
@@ -859,7 +872,7 @@ function QuranRecitationsSection({
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-500 dark:text-neutral-400">
-          <span>{episodes.length.toLocaleString('ar-EG')} سورة متاحة من المصدر</span>
+          <span>{episodes.length.toLocaleString('ar-EG')} تلاوة متاحة من المصدر</span>
           <a
             href={sourceUrl}
             target="_blank"
@@ -868,6 +881,16 @@ function QuranRecitationsSection({
           >
             المصدر: {sourceLabel} <ExternalLink size={12} />
           </a>
+          {extraSourceUrl && extraSourceLabel && (
+            <a
+              href={extraSourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:underline"
+            >
+              ومصدر: {extraSourceLabel} <ExternalLink size={12} />
+            </a>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mt-4">
@@ -903,7 +926,7 @@ function QuranRecitationsSection({
                   <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100 truncate">{episode.title}</h3>
                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400">تلاوة بصوت {reciterName}</p>
                 </div>
-                <Badge variant="neutral" size="sm" className="flex-shrink-0">MP3</Badge>
+                <Badge variant="neutral" size="sm" className="flex-shrink-0">صوت</Badge>
               </div>
             );
           })}
