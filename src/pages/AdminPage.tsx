@@ -50,6 +50,9 @@ import {
   clearAdminAccessCache,
   getAdminDashboard,
   type AdminDashboard,
+  type AdminUser,
+  type ListeningSummary,
+  type UserListeningReport,
 } from '@/lib/admin';
 
 type Tab = 'overview' | 'users' | 'activity' | 'content' | 'tools';
@@ -157,6 +160,11 @@ export default function AdminPage() {
   const [newAdmin, setNewAdmin] = useState('');
   const [xpDraft, setXpDraft] = useState('');
   const [notifyDraft, setNotifyDraft] = useState({ title: '', body: '' });
+  const [listeningDetail, setListeningDetail] = useState<{
+    userId: string;
+    report: UserListeningReport | null;
+    loading: boolean;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -198,12 +206,32 @@ export default function AdminPage() {
   const users = useMemo(() => data?.users ?? [], [data]);
   const selected = users.find((u) => u.id === selectedId) ?? null;
 
+  // The listening column/report is cumulative since registration, not a daily counter.
+  const listeningById = useMemo(
+    () => new Map((data?.listeningReport ?? []).map((r) => [r.userId, r])),
+    [data]
+  );
+  const reportFor = (u: AdminUser): ListeningSummary | undefined => listeningById.get(u.id);
+  const lifetimeSeconds = (u: AdminUser) => reportFor(u)?.lifetimeSeconds ?? u.listeningSeconds;
+
   useEffect(() => {
     if (!selected || detailInitRef.current === selected.id) return;
     detailInitRef.current = selected.id;
     setXpDraft(String(selected.xp));
     setNotifyDraft({ title: '', body: '' });
+    setListeningDetail(null);
   }, [selected]);
+
+  const loadListening = async (userId: string) => {
+    setListeningDetail({ userId, report: null, loading: true });
+    try {
+      const report = await adminActions.getUserListening(userId);
+      setListeningDetail({ userId, report, loading: false });
+    } catch (err) {
+      setListeningDetail({ userId, report: null, loading: false });
+      setToast(err instanceof Error ? err.message : 'تعذّر تحميل تقرير الاستماع');
+    }
+  };
 
   const filteredUsers = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -223,18 +251,18 @@ export default function AdminPage() {
     list = [...list].sort((a, b) => {
       if (sort === 'recent') return (b.lastActiveAt || '').localeCompare(a.lastActiveAt || '');
       if (sort === 'joined') return (b.createdAt || '').localeCompare(a.createdAt || '');
-      if (sort === 'listening') return b.listeningSeconds - a.listeningSeconds;
+      if (sort === 'listening') return lifetimeSeconds(b) - lifetimeSeconds(a);
       return b.xp - a.xp;
     });
     return list;
-  }, [users, query, filter, sort]);
+  }, [users, query, filter, sort, listeningById]);
 
   const exportCsv = () => {
     const cells = (value: string | number) => `"${String(value ?? '').replace(/"/g, '""')}"`;
-    const header = ['الإيميل', 'الاسم', 'المستوى', 'النقاط', 'السلسلة', 'دقائق الاستماع', 'المهام المكتملة', 'آخر نشاط', 'تاريخ التسجيل'];
+    const header = ['الإيميل', 'الاسم', 'المستوى', 'النقاط', 'السلسلة', 'دقائق الاستماع منذ التسجيل', 'المهام المكتملة', 'آخر نشاط', 'تاريخ التسجيل'];
     const rows = filteredUsers.map((u) => [
       u.email, u.name, getLevelInfo(u.xp).level, u.xp, u.streak,
-      Math.round(u.listeningSeconds / 60), u.missionsCompleted,
+      Math.round(lifetimeSeconds(u) / 60), u.missionsCompleted,
       dateTime(u.lastActiveAt), dateOnly(u.createdAt),
     ]);
     const csv = `\uFEFF${[header, ...rows].map((row) => row.map(cells).join(',')).join('\r\n')}`;
@@ -476,7 +504,10 @@ export default function AdminPage() {
                   <th className="px-3 py-3 font-semibold">المستوى</th>
                   <th className="px-3 py-3 font-semibold">XP</th>
                   <th className="px-3 py-3 font-semibold">السلسلة</th>
-                  <th className="px-3 py-3 font-semibold">الاستماع</th>
+                  <th className="px-3 py-3 font-semibold" title="إجمالي الاستماع منذ أول دخول للمستخدم">
+                    الاستماع
+                    <span className="block text-[10px] font-normal text-neutral-400">منذ التسجيل</span>
+                  </th>
                   <th className="px-3 py-3 font-semibold">المهام</th>
                   <th className="px-3 py-3 font-semibold">آخر نشاط</th>
                   <th className="px-3 py-3 font-semibold">التسجيل</th>
@@ -512,7 +543,12 @@ export default function AdminPage() {
                       <td className="px-3 py-3">
                         <span className="flex items-center gap-1 text-orange-500"><Flame size={14} />{nf(u.streak)}</span>
                       </td>
-                      <td className="px-3 py-3 text-neutral-600 dark:text-neutral-300">{formatListeningTime(u.listeningSeconds)}</td>
+                      <td className="px-3 py-3 text-neutral-600 dark:text-neutral-300">
+                        <span className="font-semibold">{formatListeningTime(lifetimeSeconds(u))}</span>
+                        <span className="block text-[10px] text-neutral-400 mt-0.5">
+                          منذ {dateOnly(reportFor(u)?.firstListenAt ?? u.createdAt)}
+                        </span>
+                      </td>
                       <td className="px-3 py-3 text-neutral-600 dark:text-neutral-300">{nf(u.missionsCompleted)}</td>
                       <td className="px-3 py-3 text-xs text-neutral-500">{dateTime(u.lastActiveAt)}</td>
                       <td className="px-3 py-3 text-xs text-neutral-500">{dateOnly(u.createdAt)}</td>
@@ -808,6 +844,66 @@ export default function AdminPage() {
                 </p>
               </Card>
 
+              {/* Lifetime listening report */}
+              <Card className="p-4 sm:p-5">
+                <CardHeader
+                  title="إجمالي الاستماع منذ التسجيل"
+                  subtitle="كل ما استمع إليه المستخدم منذ أول دخول للتطبيق — ليس استماع اليوم فقط"
+                />
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <InfoTile label="الإجمالي" value={formatListeningTime(lifetimeSeconds(selected))} icon={Headphones} />
+                  <InfoTile label="أول استماع" value={dateOnly(reportFor(selected)?.firstListenAt ?? null)} icon={CalendarDays} />
+                  <InfoTile label="آخر استماع" value={dateOnly(reportFor(selected)?.lastListenAt ?? null)} icon={Clock} />
+                  <InfoTile label="أيام الاستماع" value={reportFor(selected)?.activeDays ?? 0} icon={ActivityIcon} />
+                </div>
+                {(reportFor(selected)?.byCategory?.length ?? 0) > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs font-bold text-neutral-500 dark:text-neutral-400">حسب التصنيف</p>
+                    {reportFor(selected)?.byCategory.map((c) => (
+                      <div key={c.category} className="flex items-center justify-between gap-3 text-xs">
+                        <span className="font-semibold text-neutral-700 dark:text-neutral-300 truncate">{c.category}</span>
+                        <span className="text-neutral-500 whitespace-nowrap">{formatListeningTime(c.seconds)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-4">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    leftIcon={<Headphones size={15} />}
+                    disabled={!!listeningDetail?.loading || !reportFor(selected)}
+                    title={!reportFor(selected) ? 'شغّل ميجريشن تقرير الاستماع أولاً' : undefined}
+                    onClick={() => void loadListening(selected.id)}
+                  >
+                    {listeningDetail?.loading ? 'جارٍ التحميل...' : 'عرض الحلقات التي استمع إليها'}
+                  </Button>
+                </div>
+                {listeningDetail?.userId === selected.id && listeningDetail.report && (
+                  <div className="mt-3 space-y-2 border-t border-neutral-200 dark:border-neutral-800 pt-3">
+                    {listeningDetail.report.episodes.length === 0 && (
+                      <p className="text-sm text-neutral-400">لا توجد حلقات مسجّلة لهذا المستخدم.</p>
+                    )}
+                    {listeningDetail.report.episodes.map((ep) => (
+                      <div key={ep.episodeId} className="flex items-start gap-3 rounded-lg bg-neutral-50 dark:bg-neutral-800/60 p-2.5">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold text-neutral-900 dark:text-white truncate">{ep.title}</p>
+                          <p className="text-[11px] text-neutral-400 truncate">{ep.podcastTitle} · {ep.category}</p>
+                          <div className="mt-1.5">
+                            <ProgressBar value={ep.percent} size="sm" />
+                          </div>
+                        </div>
+                        <div className="text-left flex-shrink-0">
+                          <p className="text-xs font-bold text-neutral-700 dark:text-neutral-200">{formatListeningTime(ep.progressSeconds)}</p>
+                          <p className="text-[10px] text-neutral-400">{ep.percent}% · {dateOnly(ep.updatedAt)}</p>
+                          {ep.completed && <Badge variant="success" size="sm">مكتملة</Badge>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+
               {/* Full data grid */}
               <section>
                 <h3 className="font-bold text-neutral-900 dark:text-white mb-3">كل بيانات المستخدم</h3>
@@ -821,7 +917,7 @@ export default function AdminPage() {
                   <InfoTile label="وقت التذكير" value={selected.reminderTime} icon={Bell} />
                   <InfoTile label="سلسلة حالية" value={selected.streak} icon={Flame} />
                   <InfoTile label="أطول سلسلة" value={selected.longestStreak} icon={Trophy} />
-                  <InfoTile label="وقت الاستماع" value={formatListeningTime(selected.listeningSeconds)} icon={Headphones} />
+                  <InfoTile label="وقت الاستماع (منذ التسجيل)" value={formatListeningTime(lifetimeSeconds(selected))} icon={Headphones} />
                   <InfoTile label="حلقات بدأها" value={selected.episodesStarted} icon={Mic} />
                   <InfoTile label="حلقات مكتملة" value={selected.episodesCompleted} icon={CheckCircle2} />
                   <InfoTile label="مهام مكتملة" value={selected.missionsCompleted} icon={Target} />

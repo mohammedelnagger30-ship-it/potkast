@@ -59,6 +59,43 @@ export interface AdminUser {
   lastActiveAt: string | null;
 }
 
+export interface ListeningCategory {
+  category: string;
+  seconds: number;
+}
+
+/** Cumulative listening for one user, from the moment they first used the app. */
+export interface ListeningSummary {
+  userId: string;
+  joinedAt: string;
+  lifetimeSeconds: number;
+  historySeconds: number;
+  statsSeconds: number;
+  firstListenAt: string | null;
+  lastListenAt: string | null;
+  episodesStarted: number;
+  episodesCompleted: number;
+  activeDays: number;
+  byCategory: ListeningCategory[];
+}
+
+export interface ListeningEpisode {
+  episodeId: string;
+  title: string;
+  podcastTitle: string;
+  category: string;
+  durationSeconds: number;
+  progressSeconds: number;
+  percent: number;
+  completed: boolean;
+  updatedAt: string | null;
+}
+
+export interface UserListeningReport {
+  summary: ListeningSummary;
+  episodes: ListeningEpisode[];
+}
+
 export interface ActivityDay {
   day: string;
   label: string;
@@ -116,6 +153,8 @@ export interface AdminDashboard {
   isAdmin: boolean;
   totals: AdminTotals;
   users: AdminUser[];
+  /** Optional until the lifetime-listening migration is run. */
+  listeningReport?: ListeningSummary[];
   activity: ActivityDay[];
   levels: LevelCount[];
   interests: InterestCount[];
@@ -131,7 +170,20 @@ async function callRpc<T>(name: string, args?: Record<string, unknown>): Promise
   return data as T;
 }
 
-export function getAdminDashboard() {
+// Remember once if the new RPC is not deployed so we don't spam 404s on every load.
+let listeningRpcAvailable: boolean | null = null;
+
+export async function getAdminDashboard(): Promise<AdminDashboard> {
+  if (listeningRpcAvailable !== false) {
+    try {
+      const result = await callRpc<AdminDashboard>('admin_get_dashboard_with_listening');
+      listeningRpcAvailable = true;
+      return result;
+    } catch {
+      // The app still works if the lifetime-listening migration has not been run.
+      listeningRpcAvailable = false;
+    }
+  }
   return callRpc<AdminDashboard>('admin_get_dashboard');
 }
 
@@ -142,6 +194,8 @@ async function checkAdminAccess() {
 }
 
 export const adminActions = {
+  getUserListening: (userId: string) =>
+    callRpc<UserListeningReport>('admin_get_user_listening', { p_user_id: userId }),
   sendNotification: (userId: string, title: string, body: string, link?: string) =>
     callRpc<{ success: boolean }>('admin_send_notification', {
       p_user_id: userId,
