@@ -82,27 +82,35 @@ export default function MissionsPage() {
       return [];
     }
 
-    // Filter by user interests if available
-    let candidates = allDailyMissions as Mission[];
-    if (interestCategoryNames.length > 0) {
-      const interestMatches = candidates.filter(
+    // Interest matches first, then the rest as fillers
+    const candidates = [...(allDailyMissions as Mission[])].sort((a, b) => {
+      const aMatch = a.category && interestCategoryNames.includes(a.category.name_ar) ? 0 : 1;
+      const bMatch = b.category && interestCategoryNames.includes(b.category.name_ar) ? 0 : 1;
+      return aMatch - bMatch;
+    });
+
+    // One mission per difficulty level so every day has a balanced set
+    const pickForLevel = (level: 'easy' | 'medium' | 'hard'): Mission | null => {
+      const pool = candidates.filter((m) => m.difficulty === level);
+      if (pool.length === 0) return null;
+      const preferred = pool.filter(
         (m) => m.category && interestCategoryNames.includes(m.category.name_ar)
       );
-      // If we have enough interest matches, use them; otherwise mix with general
-      if (interestMatches.length >= 3) {
-        candidates = interestMatches;
-      } else {
-        // Add some non-interest missions to fill up
-        const others = candidates.filter(
-          (m) => !m.category || !interestCategoryNames.includes(m.category.name_ar)
-        );
-        candidates = [...interestMatches, ...others];
-      }
-    }
+      const source = preferred.length > 0 ? preferred : pool;
+      return source[Math.floor(Math.random() * source.length)];
+    };
 
-    // Pick 3 random missions (deterministic-ish: shuffle and take first 3)
-    const shuffled = [...candidates].sort(() => Math.random() - 0.5);
-    const selected = shuffled.slice(0, 3);
+    const selected = [
+      pickForLevel('easy'),
+      pickForLevel('medium'),
+      pickForLevel('hard'),
+    ].filter((m): m is Mission => m !== null);
+
+    // Fill any missing level with the next best candidate
+    for (const mission of candidates) {
+      if (selected.length >= 3) break;
+      if (!selected.some((m) => m.id === mission.id)) selected.push(mission);
+    }
 
     // Insert them as user_missions
     const inserts = selected.map((m) => ({

@@ -64,7 +64,11 @@ export function DailyWheel() {
           detail = `${tip.text_ar}${tip.author_or_source ? ' — ' + tip.author_or_source : ''}`;
         }
       } else if (segment.type === 'mission') {
-        const { data: missions } = await supabase.from('missions').select('id, title, xp_reward').limit(20);
+        const { data: missions } = await supabase
+          .from('missions')
+          .select('id, title, xp_reward')
+          .eq('type', 'daily')
+          .limit(20);
         if (missions && missions.length > 0) {
           const mission = missions[Math.floor(Math.random() * missions.length)];
           detail = mission.title;
