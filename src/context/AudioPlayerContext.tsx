@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { recordListeningProgress } from '@/lib/statsHelper';
+import { supabase } from '@/lib/supabase';
+import { bySeries } from '@/lib/episodeOrder';
 import { optimizedImageUrl } from '@/lib/imageUrls';
 import { localUrlFor, OFFLINE_AUDIO_PREFIX } from '@/lib/downloads';
 import { isQuranRecitationId } from '@/lib/ahmedArabiQuran';
@@ -200,9 +202,16 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   // Once crossed, completion is sticky for the session: later 5-second saves
   // (and replays) must never write `completed: false` over it.
   const completedIdsRef = useRef<Set<string>>(new Set(getCompletedCache()));
-  const saveProgressRef = useRef<(_episodeId: string, _seconds: number, _completed: boolean) => Promise<void>>(
+  const saveProgressRef = useRef<(_episodeId: string, _seconds: number, _completed: boolean, _force?: boolean) => Promise<void>>(
     async () => undefined
   );
+  // The audio element is created once. These refs let its native handlers call
+  // the newest callbacks instead of the empty first-render closures (which is
+  // why "next episode after finish" never used to run).
+  const handleEndedRef = useRef<() => void>(() => undefined);
+  // A finished source can emit `ended` more than once. The source token makes
+  // auto-advance fire exactly once per episode, including the near-end fallback.
+  const endHandledTokenRef = useRef<number>(-1);
   const progressRef = useRef(0);
   const lastTimeRenderRef = useRef(0);
   // Incremented whenever the source changes so a slow history lookup can't
@@ -385,6 +394,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         completedIdsRef.current.add(episode.id);
         void saveProgressRef.current(episode.id, audio.currentTime, true);
       }
+      // Some streams never emit `ended`. Reaching the last second is the same
+      // event for the listener, so advance here too. handleEnded is token-guarded
+      // and therefore safe to call from both paths.
+      if (episode && Number.isFinite(total) && total > 0 && audio.currentTime >= total - 1) {
+        handleEndedRef.current();
+      }
       // The UI does not need 4 React renders per second. Throttling this keeps
       // the whole page responsive while the audio keeps playing smoothly.
       const now = Date.now();
@@ -421,7 +436,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       setIsBuffering(false);
       pushNotification(false);
     };
-    const onEnded = () => handleEnded();
+    const onEnded = () => handleEndedRef.current();
     const onLoadedMetadata = () => {
       setDuration(audio.duration || 0);
       pushNotification(!audio.paused);
@@ -528,16 +543,15 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   // latest save function through this ref instead of a stale closure.
   saveProgressRef.current = saveProgress;
 
-  const handleEnded = useCallback(() => {
-    if (currentEpisode) {
-      void saveProgress(currentEpisode.id, duration, true, true);
-    }
-
-    const playAt = (idx: number) => {
-      const ep = queue[idx];
-      if (!ep || !audioRef.current) return;
+  /** Start one item of the active queue. Every advance path shares this so the
+   * source, counting baseline and media notification cannot drift apart. */
+  const startQueuedEpisode = useCallback(
+    (idx: number, list: Episode[] = queue) => {
+      const ep = list[idx];
+      if (!ep || !audioRef.current) return false;
       const audio = audioRef.current;
       const token = ++playTokenRef.current;
+      endHandledTokenRef.current = -1;
       setQueueIndex(idx);
       currentEpisodeRef.current = ep;
       if (ep.podcast) currentPodcastRef.current = ep.podcast;
@@ -545,54 +559,110 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       pendingListenRef.current.set(ep.id, 0);
       lastTimeUpdateRef.current = null;
       const local = isLocalAudioUrl(resolveAudioUrl(ep.audio_url, ep.id));
-      // When looping/auto-advancing, start episodes from the beginning.
-      const source = sourceFor(ep.id, ep.audio_url, 0);
+      // Auto-advance starts the next lesson from the beginning.
+      const resumeAt = local ? cachedResumeFor(ep.id) : 0;
+      const source = sourceFor(ep.id, ep.audio_url, resumeAt);
       audio.src = source.url;
       audio.playbackRate = playbackRateRef.current;
       setIsBuffering(true);
-      audio.play().catch(() => { if (token === playTokenRef.current) setIsPlaying(false); });
-      void local;
-    };
+      void audio.play().catch(() => { if (token === playTokenRef.current) setIsPlaying(false); });
+      if (!source.local && resumeAt > 5) {
+        resumeAfterAudible(audio, resumeAt, () => token === playTokenRef.current && audioRef.current === audio);
+      }
+      return true;
+    },
+    [queue]
+  );
+
+  /** Favourites, downloads and mission links start with a one-item queue. Load
+   * the real siblings of that podcast in series order so "next after finish"
+   * works there too, not just when the user pressed "play all". */
+  const loadSiblingAndPlay = useCallback(
+    async (finished: Episode | null) => {
+      const token = playTokenRef.current;
+      const stopIfCurrent = () => {
+        if (token !== playTokenRef.current) return;
+        playTokenRef.current += 1;
+        setIsPlaying(false);
+        setIsBuffering(false);
+        stopMediaNotification();
+      };
+      if (!finished || finished.id.startsWith('curated:') || finished.id.startsWith('quran:')) {
+        stopIfCurrent();
+        return;
+      }
+      try {
+        const { data } = await supabase
+          .from('episodes')
+          .select('id, podcast_id, title, description, audio_url, duration_seconds, plays_count, published_at, image_url')
+          .eq('podcast_id', finished.podcast_id);
+        if (token !== playTokenRef.current) return;
+        const siblings = ((data || []) as Episode[])
+          .filter((ep) => !!ep.audio_url)
+          .sort(bySeries);
+        if (siblings.length === 0) {
+          stopIfCurrent();
+          return;
+        }
+        const currentIdx = siblings.findIndex((ep) => ep.id === finished.id);
+        const nextIdx = currentIdx < 0 ? 0 : (currentIdx + 1) % siblings.length;
+        const podcast = currentPodcastRef.current || finished.podcast || undefined;
+        const withPodcast = siblings.map((ep) => ({ ...ep, podcast: ep.podcast || podcast }));
+        setQueue(withPodcast);
+        startQueuedEpisode(nextIdx, withPodcast);
+      } catch {
+        stopIfCurrent();
+      }
+    },
+    [startQueuedEpisode]
+  );
+
+  const stopAfterQueue = useCallback(() => {
+    playTokenRef.current += 1;
+    setIsPlaying(false);
+    setIsBuffering(false);
+    stopMediaNotification();
+  }, []);
+
+  const handleEnded = useCallback(() => {
+    if (endHandledTokenRef.current === playTokenRef.current) return;
+    endHandledTokenRef.current = playTokenRef.current;
+
+    const finished = currentEpisodeRef.current;
+    if (finished) void saveProgressRef.current(finished.id, progressRef.current, true, true);
 
     if (repeatMode === 'one') {
       if (audioRef.current) {
-        playTokenRef.current += 1;
-        if (currentEpisode) pendingListenRef.current.set(currentEpisode.id, 0);
+        const token = ++playTokenRef.current;
+        endHandledTokenRef.current = -1;
+        if (finished) pendingListenRef.current.set(finished.id, 0);
         lastTimeUpdateRef.current = null;
         audioRef.current.currentTime = 0;
         setIsBuffering(true);
-        audioRef.current.play().catch(() => setIsPlaying(false));
+        void audioRef.current.play().catch(() => { if (token === playTokenRef.current) setIsPlaying(false); });
       }
       return;
     }
 
-    // Continue to next episode in queue by default.
-    if (queueIndex < queue.length - 1) {
-      playAt(queueIndex + 1);
+    // Ordered queue: lesson 1 → 2 → 3 … no matter where playback started.
+    if (queueIndex >= 0 && queueIndex < queue.length - 1) {
+      startQueuedEpisode(queueIndex + 1, queue);
       return;
     }
-
-    // End of queue: loop queue in "all", otherwise repeat the last episode.
-    if (queue.length > 0) {
-      if (repeatMode === 'all') {
-        playAt(0);
-      } else {
-        if (audioRef.current) {
-          playTokenRef.current += 1;
-          if (currentEpisode) pendingListenRef.current.set(currentEpisode.id, 0);
-          lastTimeUpdateRef.current = null;
-          audioRef.current.currentTime = 0;
-          setIsBuffering(true);
-          audioRef.current.play().catch(() => setIsPlaying(false));
-        }
-      }
+    if (repeatMode === 'all' && queue.length > 1) {
+      startQueuedEpisode(0, queue);
       return;
     }
+    if (queue.length <= 1) {
+      void loadSiblingAndPlay(finished);
+      return;
+    }
+    stopAfterQueue();
+  }, [queue, queueIndex, repeatMode, startQueuedEpisode, loadSiblingAndPlay, stopAfterQueue]);
 
-    playTokenRef.current += 1;
-    setIsPlaying(false);
-    stopMediaNotification();
-  }, [currentEpisode, duration, queue, queueIndex, repeatMode, saveProgress]);
+  // Native `ended` comes from an element created on the first render; this ref
+  // keeps it connected to the latest queue/repeat state.
+  handleEndedRef.current = handleEnded;
 
   // Auto-save progress periodically while playing
   useEffect(() => {
@@ -638,6 +708,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
       const audio = audioRef.current;
       const token = ++playTokenRef.current;
+      endHandledTokenRef.current = -1;
       const isCurrent = () => token === playTokenRef.current && audioRef.current === audio;
       const local = isLocalAudioUrl(resolveAudioUrl(episode.audio_url, episode.id));
       // Downloaded files seek instantly. Streamed audio starts at zero unless
@@ -717,50 +788,14 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const playNext = useCallback(() => {
     if (queue.length === 0) return;
     const nextIdx = queueIndex + 1 < queue.length ? queueIndex + 1 : 0;
-    setQueueIndex(nextIdx);
-    const nextEp = queue[nextIdx];
-    currentEpisodeRef.current = nextEp;
-    if (nextEp.podcast) currentPodcastRef.current = nextEp.podcast;
-    setCurrentEpisode(nextEp);
-    if (audioRef.current) {
-      const audio = audioRef.current;
-      const token = ++playTokenRef.current;
-      const localNext = isLocalAudioUrl(resolveAudioUrl(nextEp.audio_url, nextEp.id));
-      const resumeAt = localNext ? cachedResumeFor(nextEp.id) : 0;
-      const source = sourceFor(nextEp.id, nextEp.audio_url, resumeAt);
-      audio.src = source.url;
-      audio.playbackRate = playbackRate;
-      setIsBuffering(true);
-      audio.play().catch(() => { if (token === playTokenRef.current) setIsPlaying(false); });
-      if (!source.local && resumeAt > 5) {
-        resumeAfterAudible(audio, resumeAt, () => token === playTokenRef.current && audioRef.current === audio);
-      }
-    }
-  }, [queue, queueIndex, playbackRate]);
+    startQueuedEpisode(nextIdx, queue);
+  }, [queue, queueIndex, startQueuedEpisode]);
 
   const playPrev = useCallback(() => {
     if (queue.length === 0) return;
     const prevIdx = queueIndex - 1 >= 0 ? queueIndex - 1 : queue.length - 1;
-    setQueueIndex(prevIdx);
-    const prevEp = queue[prevIdx];
-    currentEpisodeRef.current = prevEp;
-    if (prevEp.podcast) currentPodcastRef.current = prevEp.podcast;
-    setCurrentEpisode(prevEp);
-    if (audioRef.current) {
-      const audio = audioRef.current;
-      const token = ++playTokenRef.current;
-      const localPrev = isLocalAudioUrl(resolveAudioUrl(prevEp.audio_url, prevEp.id));
-      const resumeAt = localPrev ? cachedResumeFor(prevEp.id) : 0;
-      const source = sourceFor(prevEp.id, prevEp.audio_url, resumeAt);
-      audio.src = source.url;
-      audio.playbackRate = playbackRate;
-      setIsBuffering(true);
-      audio.play().catch(() => { if (token === playTokenRef.current) setIsPlaying(false); });
-      if (!source.local && resumeAt > 5) {
-        resumeAfterAudible(audio, resumeAt, () => token === playTokenRef.current && audioRef.current === audio);
-      }
-    }
-  }, [queue, queueIndex, playbackRate]);
+    startQueuedEpisode(prevIdx, queue);
+  }, [queue, queueIndex, startQueuedEpisode]);
 
   const stop = useCallback(() => {
     playTokenRef.current += 1;
