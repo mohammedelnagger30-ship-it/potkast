@@ -146,8 +146,23 @@ export async function createNotification(
   type: string,
   title: string,
   body: string,
-  link: string | null = null
+  link: string | null = null,
+  force = false
 ): Promise<void> {
+  // Normal events go through the database function so per-type preferences are
+  // enforced even when the client is compromised. `force` is only for the
+  // explicit "send me a test" button.
+  if (!force) {
+    await supabase.rpc('create_notification_event', {
+      p_user_id: userId,
+      p_type: type,
+      p_title: title,
+      p_body: body,
+      p_link: link,
+    });
+    return;
+  }
+
   await supabase.from('notifications').insert({
     user_id: userId,
     type,

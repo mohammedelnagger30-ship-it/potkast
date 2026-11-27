@@ -424,20 +424,23 @@ Deno.serve(async (req) => {
     }
 
     // Drain all pending push deliveries (missions, achievements, admin, updates...).
+    // Per-type switches apply here too: a user who turned a type off still sees
+    // the in-app row, but it must not reach their device.
     const { data: pendingPush, error: pendingError } = await supabase
       .from("notifications")
-      .select("id, user_id, title, body, link")
+      .select("id, user_id, type, title, body, link")
       .eq("push_sent", false)
       .gte("created_at", new Date(Date.now() - 86400000).toISOString())
       .limit(100);
+    const { data: allSettings } = await supabase
+      .from("notification_settings")
+      .select("user_id, push_subscription, push_enabled, device_token, types_enabled");
+    const settingsByUser = new Map((allSettings || []).map((s) => [s.user_id, s]));
     if (!pendingError && pendingPush) {
       for (const item of pendingPush) {
-        const { data: subs } = await supabase
-          .from("notification_settings")
-          .select("push_subscription, push_enabled, device_token")
-          .eq("user_id", item.user_id)
-          .maybeSingle();
-        if (subs?.push_enabled) {
+        const subs = settingsByUser.get(item.user_id);
+        const typeAllowed = isEnabled({ types_enabled: subs?.types_enabled }, item.type);
+        if (subs?.push_enabled && typeAllowed) {
           const delivered = await sendPush(
             {
               success: true,
