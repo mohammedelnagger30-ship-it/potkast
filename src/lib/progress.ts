@@ -87,7 +87,11 @@ export function buildProgress(
     const duration = row.episode?.duration_seconds || 0;
     const listened = Math.max(0, Math.min(row.progress_seconds || 0, duration || row.progress_seconds || 0));
     acc.startedEpisodes += 1;
-    acc.completedEpisodes += row.completed ? 1 : 0;
+    // Older clients saved the position but never wrote `completed`, so treat
+    // reaching 90% as completion here too. The DB trigger keeps new writes
+    // consistent; this makes cached/offline snapshots correct immediately.
+    const reachedCompletion = duration > 0 && listened >= duration * 0.9;
+    acc.completedEpisodes += row.completed || reachedCompletion ? 1 : 0;
     acc.listenedSeconds += listened;
     acc.durationSeconds += duration;
   }
