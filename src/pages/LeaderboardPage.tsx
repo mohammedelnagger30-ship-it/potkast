@@ -23,6 +23,7 @@ interface ProfileRow {
   id: string;
   name: string | null;
   xp: number | null;
+  avatar: string | null;
 }
 
 interface MissionRow {
@@ -42,6 +43,7 @@ function missionXp(mission: MissionRow['mission']): number {
 interface LeaderboardEntry {
   user_id: string;
   name: string;
+  avatar: string | null;
   xp: number;
   totalXp: number;
   missions: number;
@@ -92,9 +94,17 @@ function LeaderboardRow({ entry }: { entry: LeaderboardEntry }) {
       <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center flex-shrink-0">
         <RankBadge rank={entry.rank} />
       </div>
-      <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 text-white flex items-center justify-center font-extrabold flex-shrink-0">
-        {entry.name.charAt(0)}
-      </div>
+      {entry.avatar ? (
+        <img
+          src={entry.avatar}
+          alt=""
+          className="w-11 h-11 rounded-full object-cover flex-shrink-0 bg-neutral-100 dark:bg-neutral-800"
+        />
+      ) : (
+        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 text-white flex items-center justify-center font-extrabold flex-shrink-0">
+          {entry.name.charAt(0)}
+        </div>
+      )}
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <p
@@ -142,7 +152,7 @@ export default function LeaderboardPage() {
 
     const [selfOptOut, profilesRes, optOutsRes, missionsRes] = await Promise.all([
       supabase.from('leaderboard_opt_outs').select('user_id').eq('user_id', user.id).maybeSingle(),
-      supabase.from('profiles').select('id, name, xp'),
+      supabase.from('profiles').select('id, name, xp, avatar'),
       supabase.from('leaderboard_opt_outs').select('user_id'),
       supabase
         .from('user_missions')
@@ -191,6 +201,7 @@ export default function LeaderboardPage() {
         return {
           user_id: p.id,
           name: p.name?.trim() || 'مستخدم',
+          avatar: p.avatar || null,
           xp: timeframe === 'weekly' ? stats.weeklyXp : totalXp,
           totalXp,
           missions: stats.count,
