@@ -435,6 +435,16 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       setIsPlaying(false);
       setIsBuffering(false);
       pushNotification(false);
+      // The 5-second autosave is torn down as soon as `isPlaying` flips false.
+      // Flush the seconds measured since the last save here, otherwise pausing
+      // (or stopping from the phone notification) silently drops them.
+      const current = currentEpisodeRef.current;
+      // Ignore the synthetic pause emitted while swapping `audio.src`: there
+      // the old position is still cached but currentTime has already reset.
+      if (current && progressRef.current > 0
+        && Math.abs(audio.currentTime - progressRef.current) < 2) {
+        void saveProgressRef.current(current.id, progressRef.current, false, true);
+      }
     };
     const onEnded = () => handleEndedRef.current();
     const onLoadedMetadata = () => {
@@ -856,15 +866,24 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     return () => { handle?.remove(); };
   }, [resumePlayback]);
 
-  // Save progress on unmount/page hide
+  // Save progress on unmount/page hide/backgrounding. Mobile browsers do not
+  // always fire pagehide when the app is merely sent to the background, so the
+  // visibility change is the reliable signal for flushing pending seconds.
   useEffect(() => {
     const onHide = () => {
       if (currentEpisode && audioRef.current && progressRef.current > 0) {
         void saveProgress(currentEpisode.id, progressRef.current, false, true);
       }
     };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') onHide();
+    };
     window.addEventListener('pagehide', onHide);
-    return () => window.removeEventListener('pagehide', onHide);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', onHide);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [currentEpisode, saveProgress]);
 
   const value = useMemo<AudioPlayerContextValue>(() => ({
